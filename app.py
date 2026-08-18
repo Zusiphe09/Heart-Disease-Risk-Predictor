@@ -22,7 +22,98 @@ st.set_page_config(
     page_icon="Heart",
     layout="centered"
 )
+st.markdown("""
+<style>
 
+/* Hide Streamlit branding */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+
+/* Main page */
+.stApp {
+    background-color: #f8fafc;
+}
+
+/* Hero Card */
+.hero-card {
+    background: white;
+    padding: 40px;
+    border-radius: 25px;
+    box-shadow: 0px 4px 20px rgba(0,0,0,0.08);
+    text-align: center;
+    margin-top: 20px;
+}
+
+/* Logo Circle */
+.logo-circle {
+    width: 90px;
+    height: 90px;
+    margin: auto;
+    border-radius: 50%;
+    background: linear-gradient(
+        135deg,
+        #dc2626,
+        #ef4444
+    );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 40px;
+    font-weight: bold;
+}
+
+/* Main Title */
+.hero-title {
+    font-size: 42px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-top: 20px;
+}
+
+/* Subtitle */
+.hero-subtitle {
+    color: #64748b;
+    font-size: 18px;
+    margin-bottom: 25px;
+}
+
+/* feature cards */
+.feature-card {
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 18px;
+    text-align: center;
+    margin-bottom: 15px;
+    border: 1px solid #e2e8f0;
+}
+
+/* Login/Register Tabs */
+.tab-box {
+    background: #e2e8f0;
+    padding: 10px;
+    border-radius: 18px;
+}
+
+/* buttons */
+.stButton>button {
+    background: #2563eb;
+    color: white;
+    border-radius: 14px;
+    border: none;
+    height: 3rem;
+    width: 100%;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.stButton>button:hover {
+    background: #1d4ed8;
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 # ============================================================
 # DATABASE CONNECTION
