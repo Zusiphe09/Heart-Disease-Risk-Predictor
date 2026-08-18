@@ -123,7 +123,7 @@ def register_user(username, email, password):
     except Exception as e:
 
         return False, f"Registration error: {e}"
-`
+
 
 # ============================================================
 # USER LOGIN
