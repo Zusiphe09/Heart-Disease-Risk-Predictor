@@ -21,23 +21,12 @@ st.set_page_config(
     page_title="Heart Disease Risk Predictor",
     layout="centered"
 )
-
-
-# ============================================================
-# CUSTOM CSS
-# ============================================================
-
 st.markdown(
     """
     <style>
 
     .hero-card {
-        background: linear-gradient(
-            135deg,
-            #0F172A,
-            #1E3A8A
-        );
-
+        background: linear-gradient(135deg, #0F172A, #1E3A8A);
         padding: 45px 30px;
         border-radius: 20px;
         text-align: center;
@@ -48,18 +37,19 @@ st.markdown(
     .logo-circle {
         width: 75px;
         height: 75px;
-        background: white;
+        background: #FFFFFF;
         border-radius: 50%;
+        margin: 0 auto 20px auto;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0 auto 20px auto;
-        font-size: 30px;
-        color: #2563EB;
+        font-size: 24px;
+        font-weight: 700;
+        color: #1E3A8A;
     }
 
     .hero-title {
-        color: white;
+        color: #FFFFFF;
         font-size: 34px;
         font-weight: 700;
         margin-bottom: 10px;
@@ -70,14 +60,23 @@ st.markdown(
         font-size: 17px;
     }
 
-    .metric-card {
-        padding: 20px;
-        border-radius: 12px;
-        background: #F8FAFC;
-        border: 1px solid #E2E8F0;
-    }
-
     </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# ============================================================
+# CUSTOM CSS
+# ============================================================
+
+st.markdown(
+    """
+    <div class="hero-card">
+        <div class="logo-circle">HD</div>
+        <div class="hero-title">Heart Disease Risk Predictor</div>
+        <div class="hero-subtitle">AI-Powered Cardiovascular Risk Assessment</div>
+    </div>
     """,
     unsafe_allow_html=True
 )
