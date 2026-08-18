@@ -22,6 +22,46 @@ st.set_page_config(
     page_icon="Heart",
     layout="centered"
 )
+
+st.image("logo.png", width=120)
+
+st.title("Heart Disease Risk Predictor")
+st.caption("AI-powered heart disease risk assessment")
+
+tab1, tab2 = st.tabs(["Sign In", "Sign Up"])
+
+with tab1:
+
+    email = st.text_input("Email", key="login_email")
+    password = st.text_input(
+        "Password",
+        type="password",
+        key="login_password"
+    )
+
+    if st.button("Sign In"):
+        st.success("Welcome back!")
+
+with tab2:
+
+    name = st.text_input(
+        "Full Name",
+        key="register_name"
+    )
+
+    email = st.text_input(
+        "Email",
+        key="register_email"
+    )
+
+    password = st.text_input(
+        "Password",
+        type="password",
+        key="register_password"
+    )
+
+    if st.button("Create Account"):
+        st.success("Account created!")
 st.markdown("""
 <style>
 
