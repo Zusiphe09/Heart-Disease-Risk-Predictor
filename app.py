@@ -21,6 +21,12 @@ st.set_page_config(
     page_title="Heart Disease Risk Predictor",
     layout="centered"
 )
+
+
+# ============================================================
+# CUSTOM CSS
+# ============================================================
+
 st.markdown(
     """
     <style>
@@ -61,22 +67,6 @@ st.markdown(
     }
 
     </style>
-    """,
-    unsafe_allow_html=True
-)
-
-
-# ============================================================
-# CUSTOM CSS
-# ============================================================
-
-st.markdown(
-    """
-    <div class="hero-card">
-        <div class="logo-circle">HD</div>
-        <div class="hero-title">Heart Disease Risk Predictor</div>
-        <div class="hero-subtitle">AI-Powered Cardiovascular Risk Assessment</div>
-    </div>
     """,
     unsafe_allow_html=True
 )
@@ -132,7 +122,6 @@ cursor.execute(
     """
 )
 
-
 conn.commit()
 
 
@@ -157,7 +146,6 @@ if "username" not in st.session_state:
 def register_user(username, email, password):
 
     if not username or not email or not password:
-
         return False, "Please complete all fields."
 
     hashed_password = bcrypt.hashpw(
@@ -564,19 +552,16 @@ if not st.session_state.logged_in:
             "Sign in to access your health assessments and prediction history."
         )
 
-
         username = st.text_input(
             "Username",
             key="login_username"
         )
-
 
         password = st.text_input(
             "Password",
             type="password",
             key="login_password"
         )
-
 
         if st.button(
             "Sign In",
@@ -589,7 +574,6 @@ if not st.session_state.logged_in:
                 password
             )
 
-
             if user:
 
                 st.session_state.logged_in = True
@@ -599,7 +583,6 @@ if not st.session_state.logged_in:
                 st.session_state.username = user[1]
 
                 st.rerun()
-
 
             else:
 
@@ -622,18 +605,15 @@ if not st.session_state.logged_in:
             "Create an account to save and track your assessments."
         )
 
-
         username = st.text_input(
             "Username",
             key="register_username"
         )
 
-
         email = st.text_input(
             "Email",
             key="register_email"
         )
-
 
         password = st.text_input(
             "Password",
@@ -641,13 +621,11 @@ if not st.session_state.logged_in:
             key="register_password"
         )
 
-
         confirm_password = st.text_input(
             "Confirm Password",
             type="password",
             key="register_confirm"
         )
-
 
         if st.button(
             "Create Account",
@@ -661,7 +639,6 @@ if not st.session_state.logged_in:
                     "Passwords do not match."
                 )
 
-
             else:
 
                 success, message = register_user(
@@ -669,7 +646,6 @@ if not st.session_state.logged_in:
                     email,
                     password
                 )
-
 
                 if success:
 
@@ -680,7 +656,6 @@ if not st.session_state.logged_in:
                     st.info(
                         "You can now sign in using the Sign In tab."
                     )
-
 
                 else:
 
@@ -703,11 +678,9 @@ else:
         "Heart Disease Predictor"
     )
 
-
     st.sidebar.success(
         f"Welcome, {st.session_state.username}"
     )
-
 
     menu = st.sidebar.radio(
         "Dashboard",
@@ -735,7 +708,6 @@ else:
             "Model Comparison"
         )
 
-
         comparison_df = pd.DataFrame(
             {
                 "Model": list(
@@ -749,12 +721,10 @@ else:
             }
         )
 
-
         st.sidebar.dataframe(
             comparison_df,
             hide_index=True
         )
-
 
         st.sidebar.write(
             f"Best performer: {best_name}"
@@ -775,22 +745,18 @@ else:
             ).index(best_name)
         )
 
-
         model = all_results[
             selected_model_name
         ]["model"]
-
 
         accuracy = all_results[
             selected_model_name
         ]["accuracy"]
 
-
         st.sidebar.metric(
             "Selected Model Accuracy",
             f"{accuracy:.1%}"
         )
-
 
         st.sidebar.write(
             f"Trained on {len(df)} patient records"
@@ -805,11 +771,9 @@ else:
             "Heart Disease Risk Predictor"
         )
 
-
         st.write(
             "Enter patient information below to predict heart disease risk."
         )
-
 
         st.info(
             "This tool is for educational purposes only and should not replace professional medical advice."
@@ -823,7 +787,6 @@ else:
         st.header(
             "Patient Information"
         )
-
 
         col1, col2 = st.columns(2)
 
@@ -841,7 +804,6 @@ else:
                 value=50
             )
 
-
             sex = st.selectbox(
                 "Sex",
                 options=[0, 1],
@@ -850,7 +812,6 @@ else:
                 if x == 0
                 else "Male"
             )
-
 
             cp = st.selectbox(
                 "Chest Pain Type",
@@ -863,7 +824,6 @@ else:
                 ][x]
             )
 
-
             trestbps = st.number_input(
                 "Resting Blood Pressure (mm Hg)",
                 min_value=80,
@@ -871,14 +831,12 @@ else:
                 value=120
             )
 
-
             chol = st.number_input(
                 "Serum Cholesterol (mg/dl)",
                 min_value=100,
                 max_value=600,
                 value=200
             )
-
 
             fbs = st.selectbox(
                 "Fasting Blood Sugar > 120 mg/dl",
@@ -888,7 +846,6 @@ else:
                 if x == 0
                 else "Yes"
             )
-
 
             restecg = st.selectbox(
                 "Resting ECG Results",
@@ -914,7 +871,6 @@ else:
                 value=150
             )
 
-
             exang = st.selectbox(
                 "Exercise Induced Angina",
                 options=[0, 1],
@@ -924,7 +880,6 @@ else:
                 else "Yes"
             )
 
-
             oldpeak = st.number_input(
                 "ST Depression (Oldpeak)",
                 min_value=0.0,
@@ -932,7 +887,6 @@ else:
                 value=1.0,
                 step=0.1
             )
-
 
             slope = st.selectbox(
                 "Slope of Peak Exercise ST",
@@ -944,12 +898,10 @@ else:
                 ][x]
             )
 
-
             ca = st.selectbox(
                 "Number of Major Vessels (0-3)",
                 options=[0, 1, 2, 3]
             )
-
 
             thal = st.selectbox(
                 "Thalassemia",
@@ -1004,7 +956,6 @@ else:
             prediction = model.predict(
                 input_data
             )[0]
-
 
             probability = model.predict_proba(
                 input_data
@@ -1076,7 +1027,6 @@ else:
                 )
             )
 
-
             conn.commit()
 
 
@@ -1090,11 +1040,9 @@ else:
                 "Prediction Results"
             )
 
-
             st.caption(
                 f"Using: {selected_model_name}"
             )
-
 
             if risk_level == "Low Risk":
 
@@ -1126,7 +1074,6 @@ else:
                 "Risk Level"
             )
 
-
             st.progress(
                 int(probability * 100)
             )
@@ -1138,7 +1085,6 @@ else:
 
             metric1, metric2, metric3 = st.columns(3)
 
-
             with metric1:
 
                 st.metric(
@@ -1146,14 +1092,12 @@ else:
                     f"{probability:.1%}"
                 )
 
-
             with metric2:
 
                 st.metric(
                     "Prediction",
                     prediction_label
                 )
-
 
             with metric3:
 
@@ -1171,7 +1115,6 @@ else:
                 "Health Recommendations"
             )
 
-
             if probability < 0.30:
 
                 st.info(
@@ -1186,7 +1129,6 @@ else:
                     """
                 )
 
-
             elif probability < 0.70:
 
                 st.warning(
@@ -1200,7 +1142,6 @@ else:
                     Consult a healthcare professional.
                     """
                 )
-
 
             else:
 
@@ -1225,9 +1166,7 @@ else:
                 "Health Alerts"
             )
 
-
             alerts_found = False
-
 
             if trestbps > 140:
 
@@ -1237,7 +1176,6 @@ else:
 
                 alerts_found = True
 
-
             if chol > 240:
 
                 st.warning(
@@ -1245,7 +1183,6 @@ else:
                 )
 
                 alerts_found = True
-
 
             if exang == 1:
 
@@ -1255,7 +1192,6 @@ else:
 
                 alerts_found = True
 
-
             if oldpeak > 2:
 
                 st.warning(
@@ -1263,7 +1199,6 @@ else:
                 )
 
                 alerts_found = True
-
 
             if not alerts_found:
 
@@ -1279,7 +1214,6 @@ else:
             st.subheader(
                 "Top Risk Factors"
             )
-
 
             if hasattr(
                 model,
@@ -1304,41 +1238,33 @@ else:
                     }
                 )
 
-
             importance_df = importance_df.sort_values(
                 by="Importance",
                 ascending=False
             ).head(10)
 
-
             fig, ax = plt.subplots(
                 figsize=(8, 5)
             )
-
 
             ax.barh(
                 importance_df["Feature"],
                 importance_df["Importance"]
             )
 
-
             ax.set_title(
                 "Top Risk Factors"
             )
-
 
             ax.set_xlabel(
                 "Importance"
             )
 
-
             ax.invert_yaxis()
-
 
             st.pyplot(
                 fig
             )
-
 
             plt.close(
                 fig
@@ -1352,7 +1278,6 @@ else:
             st.subheader(
                 "Download Report"
             )
-
 
             report = f"""
 Heart Disease Risk Report
@@ -1402,7 +1327,6 @@ machine learning application.
 It should not replace professional medical advice.
 """
 
-
             st.download_button(
                 label="Download Risk Report",
                 data=report,
@@ -1421,11 +1345,9 @@ It should not replace professional medical advice.
             "My Records"
         )
 
-
         st.write(
             "View your previous heart disease assessments."
         )
-
 
         records_df = pd.read_sql_query(
             """
@@ -1451,20 +1373,17 @@ It should not replace professional medical advice.
             )
         )
 
-
         if records_df.empty:
 
             st.info(
                 "You do not have any prediction records yet."
             )
 
-
         else:
 
             records_df["Probability"] = (
                 records_df["Probability"] * 100
             ).round(1)
-
 
             st.dataframe(
                 records_df,
@@ -1481,11 +1400,9 @@ It should not replace professional medical advice.
                 "Assessment Summary"
             )
 
-
             total_records = len(
                 records_df
             )
-
 
             high_risk = len(
                 records_df[
@@ -1493,13 +1410,11 @@ It should not replace professional medical advice.
                 ]
             )
 
-
             moderate_risk = len(
                 records_df[
                     records_df["Risk_Level"] == "Moderate Risk"
                 ]
             )
-
 
             low_risk = len(
                 records_df[
@@ -1507,9 +1422,7 @@ It should not replace professional medical advice.
                 ]
             )
 
-
             metric1, metric2, metric3, metric4 = st.columns(4)
-
 
             with metric1:
 
@@ -1518,7 +1431,6 @@ It should not replace professional medical advice.
                     total_records
                 )
 
-
             with metric2:
 
                 st.metric(
@@ -1526,14 +1438,12 @@ It should not replace professional medical advice.
                     low_risk
                 )
 
-
             with metric3:
 
                 st.metric(
                     "Moderate Risk",
                     moderate_risk
                 )
-
 
             with metric4:
 
@@ -1550,7 +1460,6 @@ It should not replace professional medical advice.
             csv_data = records_df.to_csv(
                 index=False
             )
-
 
             st.download_button(
                 label="Download My Records",
