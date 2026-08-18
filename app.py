@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import sqlite3
-import hashlib
+import bcrypt
 
 from datetime import datetime
 
@@ -19,103 +19,69 @@ from sklearn.metrics import accuracy_score
 
 st.set_page_config(
     page_title="Heart Disease Risk Predictor",
-    page_icon="Heart",
     layout="centered"
 )
 
 
-st.markdown("""
-<style>
+# ============================================================
+# CUSTOM CSS
+# ============================================================
 
-/* Hide Streamlit branding */
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
+st.markdown(
+    """
+    <style>
 
-/* Main page */
-.stApp {
-    background-color: #f8fafc;
-}
+    .hero-card {
+        background: linear-gradient(
+            135deg,
+            #0F172A,
+            #1E3A8A
+        );
 
-/* Hero Card */
-.hero-card {
-    background: white;
-    padding: 40px;
-    border-radius: 25px;
-    box-shadow: 0px 4px 20px rgba(0,0,0,0.08);
-    text-align: center;
-    margin-top: 20px;
-}
+        padding: 45px 30px;
+        border-radius: 20px;
+        text-align: center;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    }
 
-/* Logo Circle */
-.logo-circle {
-    width: 90px;
-    height: 90px;
-    margin: auto;
-    border-radius: 50%;
-    background: linear-gradient(
-        135deg,
-        #dc2626,
-        #ef4444
-    );
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 40px;
-    font-weight: bold;
-}
+    .logo-circle {
+        width: 75px;
+        height: 75px;
+        background: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px auto;
+        font-size: 30px;
+        color: #2563EB;
+    }
 
-/* Main Title */
-.hero-title {
-    font-size: 42px;
-    font-weight: 700;
-    color: #0f172a;
-    margin-top: 20px;
-}
+    .hero-title {
+        color: white;
+        font-size: 34px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
 
-/* Subtitle */
-.hero-subtitle {
-    color: #64748b;
-    font-size: 18px;
-    margin-bottom: 25px;
-}
+    .hero-subtitle {
+        color: #DBEAFE;
+        font-size: 17px;
+    }
 
-/* feature cards */
-.feature-card {
-    background: #ffffff;
-    padding: 20px;
-    border-radius: 18px;
-    text-align: center;
-    margin-bottom: 15px;
-    border: 1px solid #e2e8f0;
-}
+    .metric-card {
+        padding: 20px;
+        border-radius: 12px;
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+    }
 
-/* Login/Register Tabs */
-.tab-box {
-    background: #e2e8f0;
-    padding: 10px;
-    border-radius: 18px;
-}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-/* buttons */
-.stButton>button {
-    background: #2563eb;
-    color: white;
-    border-radius: 14px;
-    border: none;
-    height: 3rem;
-    width: 100%;
-    font-size: 16px;
-    font-weight: 600;
-}
-
-.stButton>button:hover {
-    background: #1d4ed8;
-}
-
-</style>
-""", unsafe_allow_html=True)
 
 # ============================================================
 # DATABASE CONNECTION
@@ -130,34 +96,42 @@ cursor = conn.cursor()
 
 
 # ============================================================
-# CREATE DATABASE TABLES
+# CREATE USERS TABLE
 # ============================================================
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL
+cursor.execute(
+    """
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password BLOB NOT NULL
+    )
+    """
 )
-""")
 
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS predictions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    prediction_date TEXT NOT NULL,
-    prediction TEXT NOT NULL,
-    probability REAL NOT NULL,
-    age INTEGER,
-    sex TEXT,
-    cholesterol INTEGER,
-    blood_pressure INTEGER,
-    model TEXT,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+# ============================================================
+# CREATE PREDICTIONS TABLE
+# ============================================================
+
+cursor.execute(
+    """
+    CREATE TABLE IF NOT EXISTS predictions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        prediction_date TEXT NOT NULL,
+        prediction TEXT NOT NULL,
+        probability REAL NOT NULL,
+        age INTEGER,
+        sex TEXT,
+        cholesterol INTEGER,
+        blood_pressure INTEGER,
+        model TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+    """
 )
-""")
 
 
 conn.commit()
@@ -178,24 +152,30 @@ if "username" not in st.session_state:
 
 
 # ============================================================
-# USER REGISTRATION
+# REGISTER USER
 # ============================================================
 
 def register_user(username, email, password):
 
     if not username or not email or not password:
+
         return False, "Please complete all fields."
 
-    hashed_password = hashlib.sha256(
-        password.encode("utf-8")
-    ).hexdigest()
+    hashed_password = bcrypt.hashpw(
+        password.encode("utf-8"),
+        bcrypt.gensalt()
+    )
 
     try:
 
         cursor.execute(
             """
             INSERT INTO users
-            (username, email, password)
+            (
+                username,
+                email,
+                password
+            )
             VALUES (?, ?, ?)
             """,
             (
@@ -219,13 +199,18 @@ def register_user(username, email, password):
 
 
 # ============================================================
-# USER LOGIN
+# LOGIN USER
 # ============================================================
+
 def login_user(username, password):
 
     cursor.execute(
         """
-        SELECT id, username, email, password
+        SELECT
+            id,
+            username,
+            email,
+            password
         FROM users
         WHERE username = ?
         """,
@@ -237,18 +222,26 @@ def login_user(username, password):
     if user is None:
         return None
 
-    hashed_password = hashlib.sha256(
-        password.encode("utf-8")
-    ).hexdigest()
+    stored_hash = user[3]
 
-    stored_password = user[3]
+    try:
 
-    if hashed_password == stored_password:
-        return user
+        if bcrypt.checkpw(
+            password.encode("utf-8"),
+            stored_hash
+        ):
+
+            return user
+
+    except Exception:
+
+        return None
 
     return None
+
+
 # ============================================================
-# LOAD HEART DISEASE DATA
+# LOAD DATA
 # ============================================================
 
 @st.cache_data
@@ -263,7 +256,7 @@ def load_data():
         .str.lower()
     )
 
-    # Clean text columns
+    # Clean text values
     for column in df.columns:
 
         if df[column].dtype == "object":
@@ -291,7 +284,9 @@ def load_data():
             "nan": np.nan
         }
 
-        df["thal"] = df["thal"].map(thal_mapping)
+        df["thal"] = df["thal"].map(
+            thal_mapping
+        )
 
     # --------------------------------------------------------
     # Convert SEX
@@ -299,10 +294,12 @@ def load_data():
 
     if "sex" in df.columns:
 
-        df["sex"] = df["sex"].replace({
-            "female": 0,
-            "male": 1
-        })
+        df["sex"] = df["sex"].replace(
+            {
+                "female": 0,
+                "male": 1
+            }
+        )
 
     # --------------------------------------------------------
     # Convert FBS
@@ -310,10 +307,12 @@ def load_data():
 
     if "fbs" in df.columns:
 
-        df["fbs"] = df["fbs"].replace({
-            "no": 0,
-            "yes": 1
-        })
+        df["fbs"] = df["fbs"].replace(
+            {
+                "no": 0,
+                "yes": 1
+            }
+        )
 
     # --------------------------------------------------------
     # Convert EXANG
@@ -321,13 +320,15 @@ def load_data():
 
     if "exang" in df.columns:
 
-        df["exang"] = df["exang"].replace({
-            "no": 0,
-            "yes": 1
-        })
+        df["exang"] = df["exang"].replace(
+            {
+                "no": 0,
+                "yes": 1
+            }
+        )
 
     # --------------------------------------------------------
-    # Convert all columns to numeric
+    # Convert remaining columns
     # --------------------------------------------------------
 
     for column in df.columns:
@@ -337,17 +338,16 @@ def load_data():
             errors="coerce"
         )
 
-    # Remove rows with invalid data
+    # Remove invalid rows
     df = df.dropna()
 
-    # Convert to float
     df = df.astype(float)
 
     return df
 
 
 # ============================================================
-# TRAIN MACHINE LEARNING MODELS
+# TRAIN MODELS
 # ============================================================
 
 @st.cache_resource
@@ -413,7 +413,7 @@ def train_models(_df):
 
 
 # ============================================================
-# LOAD DATA
+# LOAD HEART DISEASE DATA
 # ============================================================
 
 try:
@@ -483,7 +483,9 @@ if missing_columns:
 
 try:
 
-    all_results, feature_names = train_models(df)
+    all_results, feature_names = train_models(
+        df
+    )
 
 except Exception as e:
 
@@ -495,179 +497,91 @@ except Exception as e:
 
 
 # ============================================================
-# FIND BEST MODEL
+# BEST MODEL
 # ============================================================
 
 best_name = max(
     all_results,
-    key=lambda name: all_results[name]["accuracy"]
+    key=lambda name:
+    all_results[name]["accuracy"]
 )
 
 
 # ============================================================
-# LOGGED OUT SECTION
+# LOGGED OUT SCREEN
 # ============================================================
 
 if not st.session_state.logged_in:
 
-    st.sidebar.title("Navigation")
+    # --------------------------------------------------------
+    # HERO SECTION
+    # --------------------------------------------------------
 
-    page = st.sidebar.selectbox(
-        "Menu",
+    st.markdown(
+        """
+        <div class="hero-card">
+
+            <div class="logo-circle">
+                HD
+            </div>
+
+            <div class="hero-title">
+                Heart Disease Risk Predictor
+            </div>
+
+            <div class="hero-subtitle">
+                AI-Powered Cardiovascular Risk Assessment
+            </div>
+
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+    # --------------------------------------------------------
+    # SIGN IN / SIGN UP TABS
+    # --------------------------------------------------------
+
+    tab1, tab2 = st.tabs(
         [
-            "Home",
-            "Login",
-            "Register"
+            "Sign In",
+            "Sign Up"
         ]
     )
 
 
     # ========================================================
-    # HOME PAGE
+    # SIGN IN
     # ========================================================
 
-    if page == "Home":
+    with tab1:
 
-        st.title(
-            "Heart Disease Risk Predictor"
+        st.subheader(
+            "Welcome Back"
         )
 
         st.write(
-            "A machine learning application for predicting "
-            "heart disease risk based on patient information."
+            "Sign in to access your health assessments and prediction history."
         )
 
-        st.info(
-            "Please create an account or log in to use the prediction system."
-        )
-
-        st.subheader(
-            "Features"
-        )
-
-        st.write(
-            """
-            - Machine learning based heart disease prediction
-            - Multiple prediction models
-            - Risk probability
-            - Risk classification
-            - Health alerts
-            - Health recommendations
-            - Personal prediction history
-            - Downloadable prediction reports
-            """
-        )
-
-        st.subheader(
-            "Available Machine Learning Models"
-        )
-
-        comparison_df = pd.DataFrame({
-
-            "Model": list(
-                all_results.keys()
-            ),
-
-            "Accuracy": [
-                f"{all_results[name]['accuracy']:.1%}"
-                for name in all_results
-            ]
-        })
-
-        st.dataframe(
-            comparison_df,
-            hide_index=True,
-            use_container_width=True
-        )
-
-
-    # ========================================================
-    # REGISTER PAGE
-    # ========================================================
-
-    elif page == "Register":
-
-        st.header(
-            "Create Account"
-        )
 
         username = st.text_input(
-            "Username"
+            "Username",
+            key="login_username"
         )
 
-        email = st.text_input(
-            "Email"
-        )
 
         password = st.text_input(
             "Password",
-            type="password"
-        )
-
-        confirm_password = st.text_input(
-            "Confirm Password",
-            type="password"
+            type="password",
+            key="login_password"
         )
 
 
         if st.button(
-            "Register",
-            type="primary"
-        ):
-
-            if password != confirm_password:
-
-                st.error(
-                    "Passwords do not match."
-                )
-
-            else:
-
-                success, message = register_user(
-                    username,
-                    email,
-                    password
-                )
-
-                if success:
-
-                    st.success(
-                        message
-                    )
-
-                    st.info(
-                        "You can now go to the Login page."
-                    )
-
-                else:
-
-                    st.error(
-                        message
-                    )
-
-
-    # ========================================================
-    # LOGIN PAGE
-    # ========================================================
-
-    elif page == "Login":
-
-        st.header(
-            "Login"
-        )
-
-        username = st.text_input(
-            "Username"
-        )
-
-        password = st.text_input(
-            "Password",
-            type="password"
-        )
-
-
-        if st.button(
-            "Login",
+            "Sign In",
+            use_container_width=True,
             type="primary"
         ):
 
@@ -675,6 +589,7 @@ if not st.session_state.logged_in:
                 username,
                 password
             )
+
 
             if user:
 
@@ -684,11 +599,8 @@ if not st.session_state.logged_in:
 
                 st.session_state.username = user[1]
 
-                st.success(
-                    "Login successful."
-                )
-
                 st.rerun()
+
 
             else:
 
@@ -697,19 +609,101 @@ if not st.session_state.logged_in:
                 )
 
 
+    # ========================================================
+    # SIGN UP
+    # ========================================================
+
+    with tab2:
+
+        st.subheader(
+            "Create Your Account"
+        )
+
+        st.write(
+            "Create an account to save and track your assessments."
+        )
+
+
+        username = st.text_input(
+            "Username",
+            key="register_username"
+        )
+
+
+        email = st.text_input(
+            "Email",
+            key="register_email"
+        )
+
+
+        password = st.text_input(
+            "Password",
+            type="password",
+            key="register_password"
+        )
+
+
+        confirm_password = st.text_input(
+            "Confirm Password",
+            type="password",
+            key="register_confirm"
+        )
+
+
+        if st.button(
+            "Create Account",
+            use_container_width=True,
+            type="primary"
+        ):
+
+            if password != confirm_password:
+
+                st.error(
+                    "Passwords do not match."
+                )
+
+
+            else:
+
+                success, message = register_user(
+                    username,
+                    email,
+                    password
+                )
+
+
+                if success:
+
+                    st.success(
+                        "Account created successfully."
+                    )
+
+                    st.info(
+                        "You can now sign in using the Sign In tab."
+                    )
+
+
+                else:
+
+                    st.error(
+                        message
+                    )
+
+
 # ============================================================
-# LOGGED IN SECTION
+# LOGGED IN APPLICATION
 # ============================================================
 
 else:
 
     # --------------------------------------------------------
-    # SIDEBAR USER INFORMATION
+    # SIDEBAR
     # --------------------------------------------------------
 
     st.sidebar.title(
-        "Navigation"
+        "Heart Disease Predictor"
     )
+
 
     st.sidebar.success(
         f"Welcome, {st.session_state.username}"
@@ -743,17 +737,18 @@ else:
         )
 
 
-        comparison_df = pd.DataFrame({
+        comparison_df = pd.DataFrame(
+            {
+                "Model": list(
+                    all_results.keys()
+                ),
 
-            "Model": list(
-                all_results.keys()
-            ),
-
-            "Accuracy": [
-                f"{all_results[name]['accuracy']:.1%}"
-                for name in all_results
-            ]
-        })
+                "Accuracy": [
+                    f"{all_results[name]['accuracy']:.1%}"
+                    for name in all_results
+                ]
+            }
+        )
 
 
         st.sidebar.dataframe(
@@ -804,19 +799,21 @@ else:
 
 
         # ----------------------------------------------------
-        # MAIN PAGE
+        # MAIN CONTENT
         # ----------------------------------------------------
 
         st.title(
             "Heart Disease Risk Predictor"
         )
 
+
         st.write(
             "Enter patient information below to predict heart disease risk."
         )
 
+
         st.info(
-            "This tool is for educational purposes and should not replace professional medical advice."
+            "This tool is for educational purposes only and should not replace professional medical advice."
         )
 
 
@@ -968,16 +965,17 @@ else:
 
 
         # ====================================================
-        # PREDICTION
+        # PREDICT
         # ====================================================
 
         if st.button(
             "Predict Risk",
-            type="primary"
+            type="primary",
+            use_container_width=True
         ):
 
             # ------------------------------------------------
-            # Create input DataFrame
+            # CREATE INPUT DATA
             # ------------------------------------------------
 
             input_data = pd.DataFrame(
@@ -1001,7 +999,7 @@ else:
 
 
             # ------------------------------------------------
-            # Make prediction
+            # PREDICTION
             # ------------------------------------------------
 
             prediction = model.predict(
@@ -1015,7 +1013,7 @@ else:
 
 
             # ------------------------------------------------
-            # Prediction label
+            # PREDICTION LABEL
             # ------------------------------------------------
 
             if prediction == 1:
@@ -1028,7 +1026,7 @@ else:
 
 
             # ------------------------------------------------
-            # Risk level
+            # RISK LEVEL
             # ------------------------------------------------
 
             if probability < 0.30:
@@ -1045,7 +1043,7 @@ else:
 
 
             # ------------------------------------------------
-            # Save prediction to SQLite
+            # SAVE TO DATABASE
             # ------------------------------------------------
 
             cursor.execute(
@@ -1084,7 +1082,7 @@ else:
 
 
             # ------------------------------------------------
-            # Results
+            # RESULTS
             # ------------------------------------------------
 
             st.divider()
@@ -1122,7 +1120,7 @@ else:
 
 
             # ------------------------------------------------
-            # Risk progress
+            # PROGRESS BAR
             # ------------------------------------------------
 
             st.subheader(
@@ -1136,7 +1134,7 @@ else:
 
 
             # ------------------------------------------------
-            # Metrics
+            # METRICS
             # ------------------------------------------------
 
             metric1, metric2, metric3 = st.columns(3)
@@ -1289,27 +1287,23 @@ else:
                 "feature_importances_"
             ):
 
-                importance_df = pd.DataFrame({
-
-                    "Feature": feature_names,
-
-                    "Importance":
-                        model.feature_importances_
-
-                })
+                importance_df = pd.DataFrame(
+                    {
+                        "Feature": feature_names,
+                        "Importance": model.feature_importances_
+                    }
+                )
 
             else:
 
-                importance_df = pd.DataFrame({
-
-                    "Feature": feature_names,
-
-                    "Importance":
-                        np.abs(
+                importance_df = pd.DataFrame(
+                    {
+                        "Feature": feature_names,
+                        "Importance": np.abs(
                             model.coef_[0]
                         )
-
-                })
+                    }
+                )
 
 
             importance_df = importance_df.sort_values(
@@ -1317,10 +1311,6 @@ else:
                 ascending=False
             ).head(10)
 
-
-            # ------------------------------------------------
-            # Chart
-            # ------------------------------------------------
 
             fig, ax = plt.subplots(
                 figsize=(8, 5)
@@ -1463,10 +1453,6 @@ It should not replace professional medical advice.
         )
 
 
-        # ----------------------------------------------------
-        # No records
-        # ----------------------------------------------------
-
         if records_df.empty:
 
             st.info(
@@ -1476,18 +1462,10 @@ It should not replace professional medical advice.
 
         else:
 
-            # ------------------------------------------------
-            # Convert probability to percentage
-            # ------------------------------------------------
-
             records_df["Probability"] = (
                 records_df["Probability"] * 100
             ).round(1)
 
-
-            # ------------------------------------------------
-            # Display records
-            # ------------------------------------------------
 
             st.dataframe(
                 records_df,
@@ -1497,7 +1475,7 @@ It should not replace professional medical advice.
 
 
             # ------------------------------------------------
-            # Statistics
+            # SUMMARY
             # ------------------------------------------------
 
             st.subheader(
@@ -1567,7 +1545,7 @@ It should not replace professional medical advice.
 
 
             # ------------------------------------------------
-            # Download records
+            # DOWNLOAD RECORDS
             # ------------------------------------------------
 
             csv_data = records_df.to_csv(
@@ -1599,11 +1577,13 @@ It should not replace professional medical advice.
 
 
 # ============================================================
-# FOOTER
+# SIDEBAR FOOTER
 # ============================================================
 
-st.sidebar.divider()
+if st.session_state.logged_in:
 
-st.sidebar.info(
-    "This application is for educational purposes and should not replace professional medical advice."
-)
+    st.sidebar.divider()
+
+    st.sidebar.info(
+        "This application is for educational purposes and should not replace professional medical advice."
+    )
