@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import sqlite3
-import bcrypt
+import hashlib
 
 from datetime import datetime
 
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    password BLOB NOT NULL
+    password TEXT NOT NULL
 )
 """)
 
@@ -93,10 +93,9 @@ def register_user(username, email, password):
     if not username or not email or not password:
         return False, "Please complete all fields."
 
-    hashed_password = bcrypt.hashpw(
-        password.encode("utf-8"),
-        bcrypt.gensalt()
-    )
+    hashed_password = hashlib.sha256(
+        password.encode("utf-8")
+    ).hexdigest()
 
     try:
 
@@ -124,12 +123,11 @@ def register_user(username, email, password):
     except Exception as e:
 
         return False, f"Registration error: {e}"
-
+`
 
 # ============================================================
 # USER LOGIN
 # ============================================================
-
 def login_user(username, password):
 
     cursor.execute(
@@ -146,22 +144,16 @@ def login_user(username, password):
     if user is None:
         return None
 
-    stored_hash = user[3]
+    hashed_password = hashlib.sha256(
+        password.encode("utf-8")
+    ).hexdigest()
 
-    try:
+    stored_password = user[3]
 
-        if bcrypt.checkpw(
-            password.encode("utf-8"),
-            stored_hash
-        ):
-            return user
-
-    except Exception:
-        return None
+    if hashed_password == stored_password:
+        return user
 
     return None
-
-
 # ============================================================
 # LOAD HEART DISEASE DATA
 # ============================================================
