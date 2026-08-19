@@ -19,8 +19,55 @@ from sklearn.metrics import accuracy_score
 
 st.set_page_config(
     page_title="Heart Disease Risk Predictor",
-    page_icon=None,
+    page_icon="❤️",
     layout="centered"
+)
+
+
+# ============================================================
+# CUSTOM CSS
+# ============================================================
+
+st.markdown(
+    """
+<style>
+
+.hero-card {
+    background: linear-gradient(135deg, #0F172A, #1E3A8A);
+    padding: 45px 30px;
+    border-radius: 20px;
+    text-align: center;
+    margin-bottom: 30px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.logo-circle {
+    width: 75px;
+    height: 75px;
+    background: white;
+    border-radius: 50%;
+    margin: 0 auto 20px auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+}
+
+.hero-title {
+    color: white;
+    font-size: 34px;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.hero-subtitle {
+    color: #DBEAFE;
+    font-size: 17px;
+}
+
+</style>
+""",
+    unsafe_allow_html=True
 )
 
 
@@ -84,32 +131,29 @@ conn.commit()
 # ADD NEW COLUMNS IF DATABASE ALREADY EXISTS
 # ============================================================
 
-def add_column_if_missing(column_name, column_definition):
-
-    cursor.execute(
+existing_columns = [
+    row[1]
+    for row in cursor.execute(
         "PRAGMA table_info(predictions)"
+    ).fetchall()
+]
+
+if "height" not in existing_columns:
+    cursor.execute(
+        "ALTER TABLE predictions ADD COLUMN height REAL"
     )
 
-    existing_columns = [
-        row[1]
-        for row in cursor.fetchall()
-    ]
+if "weight" not in existing_columns:
+    cursor.execute(
+        "ALTER TABLE predictions ADD COLUMN weight REAL"
+    )
 
-    if column_name not in existing_columns:
+if "bmi" not in existing_columns:
+    cursor.execute(
+        "ALTER TABLE predictions ADD COLUMN bmi REAL"
+    )
 
-        cursor.execute(
-            f"""
-            ALTER TABLE predictions
-            ADD COLUMN {column_name} {column_definition}
-            """
-        )
-
-        conn.commit()
-
-
-add_column_if_missing("height", "REAL")
-add_column_if_missing("weight", "REAL")
-add_column_if_missing("bmi", "REAL")
+conn.commit()
 
 
 # ============================================================
@@ -127,55 +171,15 @@ if "username" not in st.session_state:
 
 
 # ============================================================
-# CUSTOM CSS
-# ============================================================
-
-st.markdown(
-    """
-    <style>
-
-    .main-title {
-        font-size: 38px;
-        font-weight: 700;
-        color: #0F172A;
-        text-align: center;
-        margin-bottom: 5px;
-    }
-
-    .main-subtitle {
-        font-size: 18px;
-        color: #475569;
-        text-align: center;
-        margin-bottom: 30px;
-    }
-
-    .section-title {
-        font-size: 24px;
-        font-weight: 700;
-        color: #0F172A;
-    }
-
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-
-# ============================================================
 # REGISTER USER
 # ============================================================
 
 def register_user(username, email, password):
 
-    username = username.strip()
-    email = email.strip()
-
     if not username or not email or not password:
-
         return False, "Please complete all fields."
 
     if len(password) < 6:
-
         return False, "Password must contain at least 6 characters."
 
     hashed_password = bcrypt.hashpw(
@@ -231,20 +235,21 @@ def login_user(username, password):
         FROM users
         WHERE username = ?
         """,
-        (username.strip(),)
+        (username,)
     )
 
     user = cursor.fetchone()
 
     if user is None:
-
         return None
+
+    stored_hash = user[3]
 
     try:
 
         if bcrypt.checkpw(
             password.encode("utf-8"),
-            user[3]
+            stored_hash
         ):
 
             return user
@@ -265,11 +270,19 @@ def load_data():
 
     df = pd.read_csv("heart.csv")
 
+    # --------------------------------------------------------
+    # CLEAN COLUMN NAMES
+    # --------------------------------------------------------
+
     df.columns = (
         df.columns
         .str.strip()
         .str.lower()
     )
+
+    # --------------------------------------------------------
+    # CLEAN TEXT VALUES
+    # --------------------------------------------------------
 
     for column in df.columns:
 
@@ -283,7 +296,7 @@ def load_data():
             )
 
     # --------------------------------------------------------
-    # THAL
+    # CONVERT THAL
     # --------------------------------------------------------
 
     if "thal" in df.columns:
@@ -303,7 +316,7 @@ def load_data():
         )
 
     # --------------------------------------------------------
-    # SEX
+    # CONVERT SEX
     # --------------------------------------------------------
 
     if "sex" in df.columns:
@@ -316,7 +329,7 @@ def load_data():
         )
 
     # --------------------------------------------------------
-    # FBS
+    # CONVERT FBS
     # --------------------------------------------------------
 
     if "fbs" in df.columns:
@@ -329,7 +342,7 @@ def load_data():
         )
 
     # --------------------------------------------------------
-    # EXANG
+    # CONVERT EXANG
     # --------------------------------------------------------
 
     if "exang" in df.columns:
@@ -342,7 +355,7 @@ def load_data():
         )
 
     # --------------------------------------------------------
-    # NUMERIC CONVERSION
+    # CONVERT REMAINING COLUMNS
     # --------------------------------------------------------
 
     for column in df.columns:
@@ -351,6 +364,10 @@ def load_data():
             df[column],
             errors="coerce"
         )
+
+    # --------------------------------------------------------
+    # REMOVE INVALID ROWS
+    # --------------------------------------------------------
 
     df = df.dropna()
 
@@ -426,7 +443,7 @@ def train_models(_df):
 
 
 # ============================================================
-# LOAD HEART DATASET
+# LOAD HEART DISEASE DATA
 # ============================================================
 
 try:
@@ -436,7 +453,7 @@ try:
 except FileNotFoundError:
 
     st.error(
-        "heart.csv could not be found. "
+        "The file 'heart.csv' could not be found. "
         "Please place heart.csv in the same folder as app.py."
     )
 
@@ -483,7 +500,7 @@ missing_columns = [
 if missing_columns:
 
     st.error(
-        "Missing columns: "
+        "The following columns are missing from heart.csv: "
         + ", ".join(missing_columns)
     )
 
@@ -503,7 +520,7 @@ try:
 except Exception as e:
 
     st.error(
-        f"Error training models: {e}"
+        f"Error training the machine learning models: {e}"
     )
 
     st.stop()
@@ -521,247 +538,157 @@ best_name = max(
 
 
 # ============================================================
-# SIDEBAR
+# SIDEBAR ABOUT SECTION
 # ============================================================
 
-with st.sidebar:
+st.sidebar.title(
+    "❤️ Heart Disease Predictor"
+)
 
-    st.title(
-        "Heart Disease Predictor"
-    )
-
-    if st.session_state.logged_in:
-
-        st.success(
-            f"Welcome, {st.session_state.username}"
-        )
-
-        menu = st.radio(
-            "Dashboard",
-            [
-                "New Assessment",
-                "My Records",
-                "About",
-                "Logout"
-            ]
-        )
-
-    else:
-
-        menu = st.radio(
-            "Menu",
-            [
-                "Sign In",
-                "Sign Up",
-                "About"
-            ]
-        )
-
-
-# ============================================================
-# ABOUT SECTION
-# ============================================================
-
-def show_about():
-
-    st.title(
-        "About the Application"
-    )
+with st.sidebar.expander(
+    "About",
+    expanded=True
+):
 
     st.write(
         """
-        The Heart Disease Risk Predictor is an educational
-        machine-learning application designed to demonstrate
-        how patient health information can be analysed using
-        classification algorithms.
+        **Heart Disease Risk Predictor**
+
+        This application is an educational machine-learning
+        system designed to demonstrate how patient health
+        information can be used to estimate cardiovascular risk.
         """
     )
 
-    st.divider()
+    st.write("### How It Works")
 
-    st.subheader(
-        "Dataset Analytics"
+    st.write(
+        """
+        1. Create an account or sign in.
+        2. Enter patient information.
+        3. Select a machine-learning model.
+        4. Generate a risk prediction.
+        5. Review the results and risk factors.
+        6. Save and review previous assessments.
+        """
     )
 
-    metric1, metric2, metric3 = st.columns(3)
+    st.write("### Machine Learning Models")
 
-    with metric1:
+    for model_name in all_results:
 
-        st.metric(
-            "Patient Records",
-            len(df)
+        accuracy = all_results[
+            model_name
+        ]["accuracy"]
+
+        st.write(
+            f"**{model_name}** — {accuracy:.1%}"
         )
 
-    with metric2:
-
-        st.metric(
-            "Features",
-            len(feature_names)
-        )
-
-    with metric3:
-
-        st.metric(
-            "Target Classes",
-            df["target"].nunique()
-        )
+    st.write("### Dataset")
 
     st.write(
-        "Dataset preview:"
+        f"""
+        The application uses a heart disease dataset containing
+        **{len(df)} patient records**.
+
+        The dataset includes cardiovascular indicators such as
+        age, blood pressure, cholesterol, heart rate, chest pain,
+        exercise-induced angina and other clinical attributes.
+        """
     )
 
-    st.dataframe(
-        df.head(10),
-        use_container_width=True,
-        hide_index=True
-    )
+    st.write("### Important")
 
-    st.subheader(
-        "Target Distribution"
-    )
-
-    target_counts = df["target"].value_counts()
-
-    target_df = pd.DataFrame(
-        {
-            "Target": [
-                "No Heart Disease"
-                if value == 0
-                else "Heart Disease"
-                for value in target_counts.index
-            ],
-            "Patients": target_counts.values
-        }
-    )
-
-    st.dataframe(
-        target_df,
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.divider()
-
-    st.subheader(
-        "Model Performance"
-    )
-
-    st.write(
-        "The application trains and compares three machine-learning models using the same dataset."
-    )
-
-    model_data = []
-
-    for name, result in all_results.items():
-
-        model_data.append(
-            {
-                "Model": name,
-                "Accuracy": f"{result['accuracy']:.1%}"
-            }
-        )
-
-    performance_df = pd.DataFrame(
-        model_data
-    )
-
-    st.dataframe(
-        performance_df,
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.success(
-        f"Best performing model: {best_name}"
-    )
-
-    st.subheader(
-        "Model Descriptions"
-    )
-
-    st.write(
-        "Random Forest"
-    )
-
-    st.caption(
-        "An ensemble classification model that combines multiple decision trees."
-    )
-
-    st.write(
-        "Gradient Boosting"
-    )
-
-    st.caption(
-        "A sequential ensemble model that builds stronger predictions by improving previous models."
-    )
-
-    st.write(
-        "Logistic Regression"
-    )
-
-    st.caption(
-        "A statistical classification model used for binary prediction."
-    )
-
-    st.divider()
-
-    st.info(
-        "This application is for educational purposes only and should not replace professional medical advice."
+    st.warning(
+        "This application is for educational purposes only "
+        "and should not replace professional medical advice."
     )
 
 
 # ============================================================
-# LOGGED OUT APPLICATION
+# LANDING PAGE
 # ============================================================
 
 if not st.session_state.logged_in:
 
-    if menu == "About":
+    # ========================================================
+    # HERO SECTION
+    # ========================================================
 
-        show_about()
+    st.markdown(
+        """
+<div class="hero-card">
 
-    else:
+    <div class="logo-circle">
+        ❤️
+    </div>
 
-        st.title(
-            "Heart Disease Risk Predictor"
+    <div class="hero-title">
+        Heart Disease Risk Predictor
+    </div>
+
+    <div class="hero-subtitle">
+        AI-Powered Cardiovascular Risk Assessment
+    </div>
+
+</div>
+""",
+        unsafe_allow_html=True
+    )
+
+
+    # ========================================================
+    # SIGN IN / SIGN UP TABS
+    # ========================================================
+
+    tab1, tab2 = st.tabs(
+        [
+            "Sign In",
+            "Sign Up"
+        ]
+    )
+
+
+    # ========================================================
+    # SIGN IN
+    # ========================================================
+
+    with tab1:
+
+        st.header(
+            "Welcome Back"
         )
 
         st.write(
-            "AI-Powered Cardiovascular Risk Assessment"
+            "Sign in to access your health assessments "
+            "and prediction history."
         )
 
-        st.write(
-            "Sign in or create an account to access the prediction system."
+        username = st.text_input(
+            "Username",
+            key="login_username"
         )
 
-        st.divider()
+        password = st.text_input(
+            "Password",
+            type="password",
+            key="login_password"
+        )
 
-        if menu == "Sign In":
+        if st.button(
+            "Sign In",
+            use_container_width=True,
+            type="primary"
+        ):
 
-            st.header(
-                "Welcome Back"
-            )
+            if not username or not password:
 
-            st.write(
-                "Sign in to access your health assessments and prediction history."
-            )
+                st.error(
+                    "Please enter your username and password."
+                )
 
-            username = st.text_input(
-                "Username",
-                key="login_username"
-            )
-
-            password = st.text_input(
-                "Password",
-                type="password",
-                key="login_password"
-            )
-
-            if st.button(
-                "Sign In",
-                use_container_width=True,
-                type="primary"
-            ):
+            else:
 
                 user = login_user(
                     username,
@@ -784,113 +711,154 @@ if not st.session_state.logged_in:
                         "Invalid username or password."
                     )
 
-        elif menu == "Sign Up":
 
-            st.header(
-                "Create Your Account"
-            )
+    # ========================================================
+    # SIGN UP
+    # ========================================================
 
-            st.write(
-                "Create an account to save and track your assessments."
-            )
+    with tab2:
 
-            username = st.text_input(
-                "Username",
-                key="register_username"
-            )
+        st.header(
+            "Create Your Account"
+        )
 
-            email = st.text_input(
-                "Email",
-                key="register_email"
-            )
+        st.write(
+            "Create an account to save and track your "
+            "heart disease assessments."
+        )
 
-            password = st.text_input(
-                "Password",
-                type="password",
-                key="register_password"
-            )
+        username = st.text_input(
+            "Username",
+            key="register_username"
+        )
 
-            confirm_password = st.text_input(
-                "Confirm Password",
-                type="password",
-                key="register_confirm"
-            )
+        email = st.text_input(
+            "Email",
+            key="register_email"
+        )
 
-            if st.button(
-                "Create Account",
-                use_container_width=True,
-                type="primary"
-            ):
+        password = st.text_input(
+            "Password",
+            type="password",
+            key="register_password"
+        )
 
-                if password != confirm_password:
+        confirm_password = st.text_input(
+            "Confirm Password",
+            type="password",
+            key="register_confirm"
+        )
 
-                    st.error(
-                        "Passwords do not match."
+        if st.button(
+            "Create Account",
+            use_container_width=True,
+            type="primary"
+        ):
+
+            if password != confirm_password:
+
+                st.error(
+                    "Passwords do not match."
+                )
+
+            else:
+
+                success, message = register_user(
+                    username,
+                    email,
+                    password
+                )
+
+                if success:
+
+                    st.success(
+                        "Account created successfully."
+                    )
+
+                    st.info(
+                        "You can now sign in using the Sign In tab."
                     )
 
                 else:
 
-                    success, message = register_user(
-                        username,
-                        email,
-                        password
+                    st.error(
+                        message
                     )
-
-                    if success:
-
-                        st.success(
-                            "Account created successfully."
-                        )
-
-                        st.info(
-                            "You can now sign in using the Sign In option in the sidebar."
-                        )
-
-                    else:
-
-                        st.error(
-                            message
-                        )
 
 
 # ============================================================
-# LOGGED IN APPLICATION
+# LOGGED-IN APPLICATION
 # ============================================================
 
 else:
 
     # ========================================================
-    # ABOUT
+    # SIDEBAR USER INFORMATION
     # ========================================================
 
-    if menu == "About":
+    st.sidebar.success(
+        f"Welcome, {st.session_state.username}"
+    )
 
-        show_about()
+
+    # ========================================================
+    # SIDEBAR NAVIGATION
+    # ========================================================
+
+    menu = st.sidebar.radio(
+        "Dashboard",
+        [
+            "New Assessment",
+            "My Records",
+            "Logout"
+        ]
+    )
 
 
     # ========================================================
     # NEW ASSESSMENT
     # ========================================================
 
-    elif menu == "New Assessment":
+    if menu == "New Assessment":
 
-        st.title(
-            "New Heart Disease Assessment"
+        # ----------------------------------------------------
+        # MODEL COMPARISON
+        # ----------------------------------------------------
+
+        st.sidebar.divider()
+
+        st.sidebar.header(
+            "Model Comparison"
         )
 
-        st.write(
-            "Enter the patient's information below."
+        comparison_df = pd.DataFrame(
+            {
+                "Model": list(
+                    all_results.keys()
+                ),
+
+                "Accuracy": [
+                    f"{all_results[name]['accuracy']:.1%}"
+                    for name in all_results
+                ]
+            }
         )
 
-        st.info(
-            "This tool is for educational purposes only and should not replace professional medical advice."
+        st.sidebar.dataframe(
+            comparison_df,
+            hide_index=True
         )
+
+        st.sidebar.write(
+            f"Best performer: {best_name}"
+        )
+
 
         # ----------------------------------------------------
         # MODEL SELECTOR
         # ----------------------------------------------------
 
-        selected_model_name = st.selectbox(
+        selected_model_name = st.sidebar.selectbox(
             "Choose Prediction Model",
             options=list(
                 all_results.keys()
@@ -908,21 +876,49 @@ else:
             selected_model_name
         ]["accuracy"]
 
-        st.caption(
-            f"Selected model accuracy: {accuracy:.1%}"
+        st.sidebar.metric(
+            "Selected Model Accuracy",
+            f"{accuracy:.1%}"
         )
 
-        st.divider()
+        st.sidebar.write(
+            f"Trained on {len(df)} patient records"
+        )
 
-        # ----------------------------------------------------
+
+        # ====================================================
+        # MAIN CONTENT
+        # ====================================================
+
+        st.title(
+            "Heart Disease Risk Predictor"
+        )
+
+        st.write(
+            "Enter patient information below to predict "
+            "heart disease risk."
+        )
+
+        st.info(
+            "This tool is for educational purposes only "
+            "and should not replace professional medical advice."
+        )
+
+
+        # ====================================================
         # PATIENT INFORMATION
-        # ----------------------------------------------------
+        # ====================================================
 
         st.header(
             "Patient Information"
         )
 
         col1, col2 = st.columns(2)
+
+
+        # ====================================================
+        # COLUMN 1
+        # ====================================================
 
         with col1:
 
@@ -947,7 +943,7 @@ else:
                 min_value=50.0,
                 max_value=250.0,
                 value=170.0,
-                step=0.5
+                step=1.0
             )
 
             weight = st.number_input(
@@ -955,7 +951,7 @@ else:
                 min_value=20.0,
                 max_value=300.0,
                 value=70.0,
-                step=0.5
+                step=1.0
             )
 
             cp = st.selectbox(
@@ -983,8 +979,6 @@ else:
                 value=200
             )
 
-        with col2:
-
             fbs = st.selectbox(
                 "Fasting Blood Sugar > 120 mg/dl",
                 options=[0, 1],
@@ -1004,8 +998,30 @@ else:
                 ][x]
             )
 
+
+        # ====================================================
+        # COLUMN 2
+        # ====================================================
+
+        with col2:
+
+            # ------------------------------------------------
+            # BMI CALCULATION
+            # ------------------------------------------------
+
+            height_m = height / 100
+
+            bmi = weight / (
+                height_m ** 2
+            )
+
+            st.metric(
+                "Calculated BMI",
+                f"{bmi:.1f}"
+            )
+
             thalach = st.number_input(
-                "Maximum Heart Rate Achieved",
+                "Max Heart Rate Achieved",
                 min_value=60,
                 max_value=250,
                 value=150
@@ -1054,32 +1070,20 @@ else:
                 ][x]
             )
 
-        # ----------------------------------------------------
-        # BMI
-        # ----------------------------------------------------
 
-        if height > 0:
-
-            bmi = weight / ((height / 100) ** 2)
-
-        else:
-
-            bmi = 0
-
-        st.metric(
-            "Calculated BMI",
-            f"{bmi:.1f}"
-        )
-
-        # ----------------------------------------------------
+        # ====================================================
         # PREDICT
-        # ----------------------------------------------------
+        # ====================================================
 
         if st.button(
             "Predict Risk",
             type="primary",
             use_container_width=True
         ):
+
+            # ------------------------------------------------
+            # CREATE INPUT DATA
+            # ------------------------------------------------
 
             input_data = pd.DataFrame(
                 [[
@@ -1100,6 +1104,11 @@ else:
                 columns=feature_names
             )
 
+
+            # ------------------------------------------------
+            # PREDICTION
+            # ------------------------------------------------
+
             prediction = model.predict(
                 input_data
             )[0]
@@ -1108,6 +1117,11 @@ else:
                 input_data
             )[0][1]
 
+
+            # ------------------------------------------------
+            # PREDICTION LABEL
+            # ------------------------------------------------
+
             if prediction == 1:
 
                 prediction_label = "Positive"
@@ -1115,6 +1129,7 @@ else:
             else:
 
                 prediction_label = "Negative"
+
 
             # ------------------------------------------------
             # RISK LEVEL
@@ -1132,8 +1147,9 @@ else:
 
                 risk_level = "High Risk"
 
+
             # ------------------------------------------------
-            # SAVE RESULT
+            # SAVE TO DATABASE
             # ------------------------------------------------
 
             cursor.execute(
@@ -1177,9 +1193,10 @@ else:
 
             conn.commit()
 
-            # ------------------------------------------------
+
+            # =================================================
             # RESULTS
-            # ------------------------------------------------
+            # =================================================
 
             st.divider()
 
@@ -1188,33 +1205,52 @@ else:
             )
 
             st.caption(
-                f"Model used: {selected_model_name}"
+                f"Using: {selected_model_name}"
             )
+
+
+            # ------------------------------------------------
+            # RISK MESSAGE
+            # ------------------------------------------------
 
             if risk_level == "Low Risk":
 
                 st.success(
-                    f"Low Risk of Heart Disease "
+                    f"{risk_level} of Heart Disease "
                     f"({probability:.1%} probability)"
                 )
 
             elif risk_level == "Moderate Risk":
 
                 st.warning(
-                    f"Moderate Risk of Heart Disease "
+                    f"{risk_level} of Heart Disease "
                     f"({probability:.1%} probability)"
                 )
 
             else:
 
                 st.error(
-                    f"High Risk of Heart Disease "
+                    f"{risk_level} of Heart Disease "
                     f"({probability:.1%} probability)"
                 )
+
+
+            # ------------------------------------------------
+            # PROGRESS BAR
+            # ------------------------------------------------
+
+            st.subheader(
+                "Risk Level"
+            )
 
             st.progress(
                 int(probability * 100)
             )
+
+
+            # =================================================
+            # METRICS
+            # =================================================
 
             metric1, metric2, metric3 = st.columns(3)
 
@@ -1235,13 +1271,55 @@ else:
             with metric3:
 
                 st.metric(
+                    "Model Accuracy",
+                    f"{accuracy:.1%}"
+                )
+
+
+            # =================================================
+            # BMI INFORMATION
+            # =================================================
+
+            st.subheader(
+                "Body Mass Index"
+            )
+
+            bmi_col1, bmi_col2 = st.columns(2)
+
+            with bmi_col1:
+
+                st.metric(
                     "BMI",
                     f"{bmi:.1f}"
                 )
 
-            # ------------------------------------------------
+            with bmi_col2:
+
+                if bmi < 18.5:
+
+                    bmi_category = "Underweight"
+
+                elif bmi < 25:
+
+                    bmi_category = "Healthy Weight"
+
+                elif bmi < 30:
+
+                    bmi_category = "Overweight"
+
+                else:
+
+                    bmi_category = "Obesity"
+
+                st.metric(
+                    "BMI Category",
+                    bmi_category
+                )
+
+
+            # =================================================
             # HEALTH RECOMMENDATIONS
-            # ------------------------------------------------
+            # =================================================
 
             st.subheader(
                 "Health Recommendations"
@@ -1251,13 +1329,13 @@ else:
 
                 st.info(
                     """
-                    Maintain regular physical activity.
+                    Continue exercising regularly.
 
-                    Maintain a balanced diet.
+                    Maintain a healthy diet.
+
+                    Schedule routine health check-ups.
 
                     Monitor blood pressure and cholesterol.
-
-                    Continue routine health check-ups.
                     """
                 )
 
@@ -1265,13 +1343,13 @@ else:
 
                 st.warning(
                     """
-                    Consider increasing physical activity.
+                    Increase physical activity.
 
-                    Maintain a balanced diet and limit saturated fats.
+                    Reduce saturated fats and sodium.
 
-                    Monitor blood pressure and cholesterol.
+                    Monitor cholesterol levels.
 
-                    Consider discussing the result with a healthcare professional.
+                    Consult a healthcare professional.
                     """
                 )
 
@@ -1279,19 +1357,20 @@ else:
 
                 st.error(
                     """
-                    Consider seeking professional medical advice.
+                    Seek medical advice promptly.
 
-                    Monitor blood pressure and cholesterol.
+                    Monitor blood pressure closely.
 
-                    Follow healthy lifestyle recommendations.
+                    Improve dietary habits.
 
-                    Do not use this prediction as a medical diagnosis.
+                    Follow prescribed treatment plans.
                     """
                 )
 
-            # ------------------------------------------------
+
+            # =================================================
             # HEALTH ALERTS
-            # ------------------------------------------------
+            # =================================================
 
             st.subheader(
                 "Health Alerts"
@@ -1299,21 +1378,24 @@ else:
 
             alerts_found = False
 
+
             if trestbps > 140:
 
                 st.warning(
-                    "Elevated resting blood pressure detected."
+                    "High blood pressure detected."
                 )
 
                 alerts_found = True
+
 
             if chol > 240:
 
                 st.warning(
-                    "Elevated cholesterol detected."
+                    "High cholesterol detected."
                 )
 
                 alerts_found = True
+
 
             if exang == 1:
 
@@ -1323,6 +1405,7 @@ else:
 
                 alerts_found = True
 
+
             if oldpeak > 2:
 
                 st.warning(
@@ -1330,6 +1413,7 @@ else:
                 )
 
                 alerts_found = True
+
 
             if bmi >= 30:
 
@@ -1339,13 +1423,13 @@ else:
 
                 alerts_found = True
 
-            if bmi < 18.5:
 
-                st.warning(
-                    "BMI is below the standard healthy range."
+            elif bmi >= 25:
+
+                st.info(
+                    "BMI is in the overweight range."
                 )
 
-                alerts_found = True
 
             if not alerts_found:
 
@@ -1353,9 +1437,10 @@ else:
                     "No additional health alerts detected."
                 )
 
-            # ------------------------------------------------
+
+            # =================================================
             # TOP RISK FACTORS
-            # ------------------------------------------------
+            # =================================================
 
             st.subheader(
                 "Top Risk Factors"
@@ -1384,47 +1469,62 @@ else:
                     }
                 )
 
+
             importance_df = importance_df.sort_values(
                 by="Importance",
                 ascending=False
             ).head(10)
 
+
             fig, ax = plt.subplots(
                 figsize=(8, 5)
             )
+
 
             ax.barh(
                 importance_df["Feature"],
                 importance_df["Importance"]
             )
 
+
             ax.set_title(
-                "Top Model Risk Factors"
+                "Top Risk Factors"
             )
+
 
             ax.set_xlabel(
                 "Importance"
             )
 
+
             ax.invert_yaxis()
+
 
             st.pyplot(
                 fig
             )
 
-            plt.close(fig)
 
-            # ------------------------------------------------
+            plt.close(
+                fig
+            )
+
+
+            # =================================================
             # DOWNLOAD REPORT
-            # ------------------------------------------------
+            # =================================================
 
             st.subheader(
                 "Download Report"
             )
 
+
             report = f"""
-HEART DISEASE RISK REPORT
-=========================
+Heart Disease Risk Report
+==========================
+
+Patient
+-------
 
 Username: {st.session_state.username}
 
@@ -1432,7 +1532,7 @@ Date:
 {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 
-PATIENT INFORMATION
+Patient Information
 -------------------
 
 Age: {age}
@@ -1445,12 +1545,14 @@ Weight: {weight:.1f} kg
 
 BMI: {bmi:.1f}
 
+BMI Category: {bmi_category}
+
 Cholesterol: {chol} mg/dl
 
 Blood Pressure: {trestbps} mm Hg
 
 
-PREDICTION RESULTS
+Prediction Results
 ------------------
 
 Prediction: {prediction_label}
@@ -1464,14 +1566,15 @@ Model Used: {selected_model_name}
 Model Accuracy: {accuracy:.2%}
 
 
-IMPORTANT
+Important
 ---------
 
-This application is for educational purposes only.
+This report is generated by an educational
+machine learning application.
 
-The result should not be used as a medical diagnosis
-or as a replacement for professional medical advice.
+It should not replace professional medical advice.
 """
+
 
             st.download_button(
                 label="Download Risk Report",
@@ -1487,13 +1590,14 @@ or as a replacement for professional medical advice.
 
     elif menu == "My Records":
 
-        st.title(
+        st.header(
             "My Records"
         )
 
         st.write(
             "View your previous heart disease assessments."
         )
+
 
         records_df = pd.read_sql_query(
             """
@@ -1522,11 +1626,13 @@ or as a replacement for professional medical advice.
             )
         )
 
+
         if records_df.empty:
 
             st.info(
                 "You do not have any prediction records yet."
             )
+
 
         else:
 
@@ -1534,7 +1640,21 @@ or as a replacement for professional medical advice.
                 records_df["Probability"] * 100
             ).round(1)
 
-            records_df["BMI"] = records_df["BMI"].round(1)
+            records_df["Height_cm"] = (
+                records_df["Height_cm"]
+                .round(1)
+            )
+
+            records_df["Weight_kg"] = (
+                records_df["Weight_kg"]
+                .round(1)
+            )
+
+            records_df["BMI"] = (
+                records_df["BMI"]
+                .round(1)
+            )
+
 
             st.dataframe(
                 records_df,
@@ -1542,13 +1662,20 @@ or as a replacement for professional medical advice.
                 hide_index=True
             )
 
+
+            # =================================================
+            # SUMMARY
+            # =================================================
+
             st.subheader(
                 "Assessment Summary"
             )
 
+
             total_records = len(
                 records_df
             )
+
 
             high_risk = len(
                 records_df[
@@ -1556,11 +1683,13 @@ or as a replacement for professional medical advice.
                 ]
             )
 
+
             moderate_risk = len(
                 records_df[
                     records_df["Risk_Level"] == "Moderate Risk"
                 ]
             )
+
 
             low_risk = len(
                 records_df[
@@ -1568,7 +1697,9 @@ or as a replacement for professional medical advice.
                 ]
             )
 
+
             metric1, metric2, metric3, metric4 = st.columns(4)
+
 
             with metric1:
 
@@ -1577,12 +1708,14 @@ or as a replacement for professional medical advice.
                     total_records
                 )
 
+
             with metric2:
 
                 st.metric(
                     "Low Risk",
                     low_risk
                 )
+
 
             with metric3:
 
@@ -1591,6 +1724,7 @@ or as a replacement for professional medical advice.
                     moderate_risk
                 )
 
+
             with metric4:
 
                 st.metric(
@@ -1598,9 +1732,15 @@ or as a replacement for professional medical advice.
                     high_risk
                 )
 
+
+            # =================================================
+            # DOWNLOAD RECORDS
+            # =================================================
+
             csv_data = records_df.to_csv(
                 index=False
             )
+
 
             st.download_button(
                 label="Download My Records",
@@ -1626,15 +1766,14 @@ or as a replacement for professional medical advice.
 
 
 # ============================================================
-# FOOTER
+# LOGGED-IN SIDEBAR FOOTER
 # ============================================================
 
-st.divider()
+if st.session_state.logged_in:
 
-st.caption(
-    "Heart Disease Risk Predictor | Educational Machine Learning Application"
-)
+    st.sidebar.divider()
 
-st.caption(
-    "This application does not provide a medical diagnosis."
-)
+    st.sidebar.info(
+        "This application is for educational purposes "
+        "and should not replace professional medical advice."
+    )
