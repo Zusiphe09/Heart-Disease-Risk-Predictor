@@ -602,7 +602,75 @@ if not st.session_state.logged_in:
             exercise-induced angina and other clinical attributes.
             """
         )
+        st.write("### Dataset")
 
+        st.write(
+            f"""
+            The application uses a heart disease dataset containing
+            **{len(df)} patient records**.
+
+            The dataset includes cardiovascular indicators such as
+            age, blood pressure, cholesterol, heart rate, chest pain,
+            exercise-induced angina and other clinical attributes.
+            """
+        )
+
+
+        # ====================================================
+        # HEART DISEASE DISTRIBUTION
+        # ====================================================
+
+        st.write("### Heart Disease Distribution")
+
+        heart_disease_count = int(
+            (df["target"] == 1).sum()
+        )
+
+        no_heart_disease_count = int(
+            (df["target"] == 0).sum()
+        )
+
+
+        fig, ax = plt.subplots(
+            figsize=(5, 5)
+        )
+
+        ax.pie(
+            [
+                heart_disease_count,
+                no_heart_disease_count
+            ],
+            labels=[
+                "Heart Disease",
+                "No Heart Disease"
+            ],
+            autopct="%1.1f%%",
+            startangle=90
+        )
+
+        ax.set_title(
+            "Heart Disease Distribution"
+        )
+
+        st.pyplot(
+            fig
+        )
+
+        plt.close(
+            fig
+        )
+
+
+        st.write(
+            f"""
+            **Heart Disease:** {heart_disease_count} patients
+
+            **No Heart Disease:** {no_heart_disease_count} patients
+            """
+        )
+
+
+        st.write("### Important")
         st.write("### Important")
 
         st.warning(
