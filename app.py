@@ -26,7 +26,6 @@ st.set_page_config(
 # ============================================================
 # CUSTOM CSS
 # ============================================================
-
 st.markdown(
     """
     <style>
@@ -503,28 +502,26 @@ if not st.session_state.logged_in:
     # LANDING PAGE HERO
     # ========================================================
 
-    st.markdown(
-        """
-        <div class="hero-card">
+st.markdown(
+    """
+    <div class="hero-card">
 
-            <div class="logo-circle">
-                ❤️
-            </div>
-
-            <div class="hero-title">
-                Heart Disease Risk Predictor
-            </div>
-
-            <div class="hero-subtitle">
-                AI-Powered Cardiovascular Risk Assessment
-            </div>
-
+        <div class="logo-circle">
+            ❤️
         </div>
-        """,
-        unsafe_allow_html=True
-    )
 
+        <div class="hero-title">
+            Heart Disease Risk Predictor
+        </div>
 
+        <div class="hero-subtitle">
+            AI-Powered Cardiovascular Risk Assessment
+        </div>
+
+    </div>
+    """,
+    unsafe_allow_html=True
+)
     # ========================================================
     # SIGN IN / SIGN UP TABS
     # ========================================================
