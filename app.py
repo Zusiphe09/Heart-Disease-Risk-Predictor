@@ -537,79 +537,79 @@ best_name = max(
 
 
 # ============================================================
-# SIDEBAR ABOUT SECTION
-# ============================================================
-
-st.sidebar.title(
-    "Heart Disease Predictor"
-)
-
-with st.sidebar.expander(
-    "About",
-    expanded=True
-):
-
-    st.write(
-        """
-        **Heart Disease Risk Predictor**
-
-        This application is an educational machine-learning
-        system designed to demonstrate how patient health
-        information can be used to estimate cardiovascular risk.
-        """
-    )
-
-    st.write("### How It Works")
-
-    st.write(
-        """
-        1. Create an account or sign in.
-        2. Enter patient information.
-        3. Select a machine-learning model.
-        4. Generate a risk prediction.
-        5. Review the results and risk factors.
-        6. Save and review previous assessments.
-        """
-    )
-
-    st.write("### Machine Learning Models")
-
-    for model_name in all_results:
-
-        accuracy = all_results[
-            model_name
-        ]["accuracy"]
-
-        st.write(
-            f"**{model_name}** — {accuracy:.1%}"
-        )
-
-    st.write("### Dataset")
-
-    st.write(
-        f"""
-        The application uses a heart disease dataset containing
-        **{len(df)} patient records**.
-
-        The dataset includes cardiovascular indicators such as
-        age, blood pressure, cholesterol, heart rate, chest pain,
-        exercise-induced angina and other clinical attributes.
-        """
-    )
-
-    st.write("### Important")
-
-    st.warning(
-        "This application is for educational purposes only "
-        "and should not replace professional medical advice."
-    )
-
-
-# ============================================================
 # LANDING PAGE
 # ============================================================
 
 if not st.session_state.logged_in:
+
+    # ========================================================
+    # SIDEBAR ABOUT SECTION
+    # ========================================================
+
+    st.sidebar.title(
+        "Heart Disease Predictor"
+    )
+
+    with st.sidebar.expander(
+        "About",
+        expanded=True
+    ):
+
+        st.write(
+            """
+            **Heart Disease Risk Predictor**
+
+            This application is an educational machine-learning
+            system designed to demonstrate how patient health
+            information can be used to estimate cardiovascular risk.
+            """
+        )
+
+        st.write("### How It Works")
+
+        st.write(
+            """
+            1. Create an account or sign in.
+            2. Enter patient information.
+            3. Select a machine-learning model.
+            4. Generate a risk prediction.
+            5. Review the results and risk factors.
+            6. Save and review previous assessments.
+            """
+        )
+
+        st.write("### Machine Learning Models")
+
+        for model_name in all_results:
+
+            accuracy = all_results[
+                model_name
+            ]["accuracy"]
+
+            st.write(
+                f"**{model_name}** — {accuracy:.1%}"
+            )
+
+        st.write("### Dataset")
+
+        st.write(
+            f"""
+            The application uses a heart disease dataset containing
+            **{len(df)} patient records**.
+
+            The dataset includes cardiovascular indicators such as
+            age, blood pressure, cholesterol, heart rate, chest pain,
+            exercise-induced angina and other clinical attributes.
+            """
+        )
+
+        st.write("### Important")
+
+        st.warning(
+            "This application is for educational purposes only "
+            "and should not replace professional medical advice."
+        )
+
 
     # ========================================================
     # HERO SECTION
