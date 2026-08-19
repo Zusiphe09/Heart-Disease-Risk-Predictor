@@ -19,6 +19,7 @@ from sklearn.metrics import accuracy_score
 
 st.set_page_config(
     page_title="Heart Disease Risk Predictor",
+    page_icon="❤️",
     layout="centered"
 )
 
@@ -26,46 +27,46 @@ st.set_page_config(
 # ============================================================
 # CUSTOM CSS
 # ============================================================
+
 st.markdown(
     """
-    <style>
+<style>
 
-    .hero-card {
-        background: linear-gradient(135deg, #0F172A, #1E3A8A);
-        padding: 45px 30px;
-        border-radius: 20px;
-        text-align: center;
-        margin-bottom: 30px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-    }
+.hero-card {
+    background: linear-gradient(135deg, #0F172A, #1E3A8A);
+    padding: 45px 30px;
+    border-radius: 20px;
+    text-align: center;
+    margin-bottom: 30px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.15);
+}
 
-    .logo-circle {
-        width: 75px;
-        height: 75px;
-        background: #FFFFFF;
-        border-radius: 50%;
-        margin: 0 auto 20px auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 32px;
-        font-weight: 700;
-    }
+.logo-circle {
+    width: 75px;
+    height: 75px;
+    background: white;
+    border-radius: 50%;
+    margin: 0 auto 20px auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+}
 
-    .hero-title {
-        color: #FFFFFF;
-        font-size: 34px;
-        font-weight: 700;
-        margin-bottom: 10px;
-    }
+.hero-title {
+    color: white;
+    font-size: 34px;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
 
-    .hero-subtitle {
-        color: #DBEAFE;
-        font-size: 17px;
-    }
+.hero-subtitle {
+    color: #DBEAFE;
+    font-size: 17px;
+}
 
-    </style>
-    """,
+</style>
+""",
     unsafe_allow_html=True
 )
 
@@ -487,8 +488,7 @@ except Exception as e:
 
 best_name = max(
     all_results,
-    key=lambda name:
-    all_results[name]["accuracy"]
+    key=lambda name: all_results[name]["accuracy"]
 )
 
 
@@ -502,26 +502,28 @@ if not st.session_state.logged_in:
     # LANDING PAGE HERO
     # ========================================================
 
-st.markdown(
-    """
-    <div class="hero-card">
+    st.markdown(
+        """
+<div class="hero-card">
 
-        <div class="logo-circle">
-            ❤️
-        </div>
+<div class="logo-circle">
+❤️
+</div>
 
-        <div class="hero-title">
-            Heart Disease Risk Predictor
-        </div>
+<div class="hero-title">
+Heart Disease Risk Predictor
+</div>
 
-        <div class="hero-subtitle">
-            AI-Powered Cardiovascular Risk Assessment
-        </div>
+<div class="hero-subtitle">
+AI-Powered Cardiovascular Risk Assessment
+</div>
 
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+</div>
+""",
+        unsafe_allow_html=True
+    )
+
+
     # ========================================================
     # SIGN IN / SIGN UP TABS
     # ========================================================
@@ -573,9 +575,7 @@ st.markdown(
             if user:
 
                 st.session_state.logged_in = True
-
                 st.session_state.user_id = user[0]
-
                 st.session_state.username = user[1]
 
                 st.rerun()
@@ -694,10 +694,6 @@ else:
 
     if menu == "New Assessment":
 
-        # ----------------------------------------------------
-        # MODEL COMPARISON
-        # ----------------------------------------------------
-
         st.sidebar.divider()
 
         st.sidebar.header(
@@ -759,9 +755,9 @@ else:
         )
 
 
-        # ----------------------------------------------------
+        # ====================================================
         # MAIN CONTENT
-        # ----------------------------------------------------
+        # ====================================================
 
         st.title(
             "Heart Disease Risk Predictor"
@@ -776,9 +772,9 @@ else:
         )
 
 
-        # ----------------------------------------------------
+        # ====================================================
         # PATIENT INFORMATION
-        # ----------------------------------------------------
+        # ====================================================
 
         st.header(
             "Patient Information"
@@ -1022,9 +1018,9 @@ else:
             conn.commit()
 
 
-            # ------------------------------------------------
+            # =================================================
             # RESULTS
-            # ------------------------------------------------
+            # =================================================
 
             st.divider()
 
@@ -1058,9 +1054,9 @@ else:
                 )
 
 
-            # ------------------------------------------------
+            # =================================================
             # PROGRESS BAR
-            # ------------------------------------------------
+            # =================================================
 
             st.subheader(
                 "Risk Level"
@@ -1071,9 +1067,9 @@ else:
             )
 
 
-            # ------------------------------------------------
+            # =================================================
             # METRICS
-            # ------------------------------------------------
+            # =================================================
 
             metric1, metric2, metric3 = st.columns(3)
 
@@ -1384,9 +1380,9 @@ It should not replace professional medical advice.
             )
 
 
-            # ------------------------------------------------
+            # =================================================
             # SUMMARY
-            # ------------------------------------------------
+            # =================================================
 
             st.subheader(
                 "Assessment Summary"
@@ -1445,9 +1441,9 @@ It should not replace professional medical advice.
                 )
 
 
-            # ------------------------------------------------
+            # =================================================
             # DOWNLOAD RECORDS
-            # ------------------------------------------------
+            # =================================================
 
             csv_data = records_df.to_csv(
                 index=False
@@ -1468,9 +1464,7 @@ It should not replace professional medical advice.
     elif menu == "Logout":
 
         st.session_state.logged_in = False
-
         st.session_state.user_id = None
-
         st.session_state.username = None
 
         st.rerun()
