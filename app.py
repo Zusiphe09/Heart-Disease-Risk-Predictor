@@ -38,7 +38,7 @@ st.markdown(
     border-radius: 20px;
     text-align: center;
     margin-bottom: 30px;
-    box-shadow: 0 10px 30px rgba(0,0,0,.15);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
 }
 
 .logo-circle {
@@ -63,68 +63,6 @@ st.markdown(
 .hero-subtitle {
     color: #DBEAFE;
     font-size: 17px;
-}
-
-.section-card {
-    background: #F8FAFC;
-    padding: 25px;
-    border-radius: 15px;
-    margin: 15px 0;
-    border: 1px solid #E2E8F0;
-}
-
-.metric-card {
-    background: white;
-    padding: 20px;
-    border-radius: 15px;
-    text-align: center;
-    border: 1px solid #E2E8F0;
-}
-
-.metric-number {
-    font-size: 28px;
-    font-weight: 700;
-    color: #1E3A8A;
-}
-
-.metric-label {
-    font-size: 14px;
-    color: #64748B;
-}
-
-.model-card {
-    background: white;
-    padding: 20px;
-    border-radius: 15px;
-    border: 1px solid #E2E8F0;
-    margin-bottom: 12px;
-}
-
-.model-name {
-    font-size: 18px;
-    font-weight: 600;
-    color: #0F172A;
-}
-
-.model-score {
-    font-size: 26px;
-    font-weight: 700;
-    color: #2563EB;
-}
-
-.step-card {
-    background: #F8FAFC;
-    padding: 20px;
-    border-radius: 15px;
-    text-align: center;
-    border: 1px solid #E2E8F0;
-    min-height: 150px;
-}
-
-.step-number {
-    font-size: 28px;
-    font-weight: 700;
-    color: #2563EB;
 }
 
 </style>
@@ -175,6 +113,9 @@ cursor.execute(
         probability REAL NOT NULL,
         age INTEGER,
         sex TEXT,
+        height REAL,
+        weight REAL,
+        bmi REAL,
         cholesterol INTEGER,
         blood_pressure INTEGER,
         model TEXT,
@@ -182,6 +123,35 @@ cursor.execute(
     )
     """
 )
+
+conn.commit()
+
+
+# ============================================================
+# ADD NEW COLUMNS IF DATABASE ALREADY EXISTS
+# ============================================================
+
+existing_columns = [
+    row[1]
+    for row in cursor.execute(
+        "PRAGMA table_info(predictions)"
+    ).fetchall()
+]
+
+if "height" not in existing_columns:
+    cursor.execute(
+        "ALTER TABLE predictions ADD COLUMN height REAL"
+    )
+
+if "weight" not in existing_columns:
+    cursor.execute(
+        "ALTER TABLE predictions ADD COLUMN weight REAL"
+    )
+
+if "bmi" not in existing_columns:
+    cursor.execute(
+        "ALTER TABLE predictions ADD COLUMN bmi REAL"
+    )
 
 conn.commit()
 
@@ -208,6 +178,9 @@ def register_user(username, email, password):
 
     if not username or not email or not password:
         return False, "Please complete all fields."
+
+    if len(password) < 6:
+        return False, "Password must contain at least 6 characters."
 
     hashed_password = bcrypt.hashpw(
         password.encode("utf-8"),
@@ -278,6 +251,7 @@ def login_user(username, password):
             password.encode("utf-8"),
             stored_hash
         ):
+
             return user
 
     except Exception:
@@ -288,7 +262,7 @@ def login_user(username, password):
 
 
 # ============================================================
-# LOAD DATASET
+# LOAD DATA
 # ============================================================
 
 @st.cache_data
@@ -297,7 +271,7 @@ def load_data():
     df = pd.read_csv("heart.csv")
 
     # --------------------------------------------------------
-    # Clean column names
+    # CLEAN COLUMN NAMES
     # --------------------------------------------------------
 
     df.columns = (
@@ -307,7 +281,7 @@ def load_data():
     )
 
     # --------------------------------------------------------
-    # Clean text values
+    # CLEAN TEXT VALUES
     # --------------------------------------------------------
 
     for column in df.columns:
@@ -322,7 +296,7 @@ def load_data():
             )
 
     # --------------------------------------------------------
-    # Convert THAL
+    # CONVERT THAL
     # --------------------------------------------------------
 
     if "thal" in df.columns:
@@ -342,7 +316,7 @@ def load_data():
         )
 
     # --------------------------------------------------------
-    # Convert SEX
+    # CONVERT SEX
     # --------------------------------------------------------
 
     if "sex" in df.columns:
@@ -355,7 +329,7 @@ def load_data():
         )
 
     # --------------------------------------------------------
-    # Convert FBS
+    # CONVERT FBS
     # --------------------------------------------------------
 
     if "fbs" in df.columns:
@@ -368,7 +342,7 @@ def load_data():
         )
 
     # --------------------------------------------------------
-    # Convert EXANG
+    # CONVERT EXANG
     # --------------------------------------------------------
 
     if "exang" in df.columns:
@@ -381,7 +355,7 @@ def load_data():
         )
 
     # --------------------------------------------------------
-    # Convert remaining columns
+    # CONVERT REMAINING COLUMNS
     # --------------------------------------------------------
 
     for column in df.columns:
@@ -392,7 +366,7 @@ def load_data():
         )
 
     # --------------------------------------------------------
-    # Remove invalid rows
+    # REMOVE INVALID ROWS
     # --------------------------------------------------------
 
     df = df.dropna()
@@ -558,54 +532,88 @@ except Exception as e:
 
 best_name = max(
     all_results,
-    key=lambda name: all_results[name]["accuracy"]
+    key=lambda name:
+    all_results[name]["accuracy"]
 )
 
 
 # ============================================================
-# DATASET ANALYTICS
+# SIDEBAR ABOUT SECTION
 # ============================================================
 
-total_patients = len(df)
-
-total_features = len(
-    df.drop(
-        "target",
-        axis=1
-    ).columns
+st.sidebar.title(
+    "❤️ Heart Disease Predictor"
 )
 
-average_age = df["age"].mean()
+with st.sidebar.expander(
+    "About",
+    expanded=True
+):
 
-average_cholesterol = df["chol"].mean()
+    st.write(
+        """
+        **Heart Disease Risk Predictor**
 
-average_blood_pressure = df["trestbps"].mean()
+        This application is an educational machine-learning
+        system designed to demonstrate how patient health
+        information can be used to estimate cardiovascular risk.
+        """
+    )
 
-positive_cases = int(
-    (df["target"] == 1).sum()
-)
+    st.write("### How It Works")
 
-negative_cases = int(
-    (df["target"] == 0).sum()
-)
+    st.write(
+        """
+        1. Create an account or sign in.
+        2. Enter patient information.
+        3. Select a machine-learning model.
+        4. Generate a risk prediction.
+        5. Review the results and risk factors.
+        6. Save and review previous assessments.
+        """
+    )
 
-positive_percentage = (
-    positive_cases / total_patients
-) * 100
+    st.write("### Machine Learning Models")
 
-negative_percentage = (
-    negative_cases / total_patients
-) * 100
+    for model_name in all_results:
+
+        accuracy = all_results[
+            model_name
+        ]["accuracy"]
+
+        st.write(
+            f"**{model_name}** — {accuracy:.1%}"
+        )
+
+    st.write("### Dataset")
+
+    st.write(
+        f"""
+        The application uses a heart disease dataset containing
+        **{len(df)} patient records**.
+
+        The dataset includes cardiovascular indicators such as
+        age, blood pressure, cholesterol, heart rate, chest pain,
+        exercise-induced angina and other clinical attributes.
+        """
+    )
+
+    st.write("### Important")
+
+    st.warning(
+        "This application is for educational purposes only "
+        "and should not replace professional medical advice."
+    )
 
 
 # ============================================================
-# PUBLIC LANDING PAGE
+# LANDING PAGE
 # ============================================================
 
 if not st.session_state.logged_in:
 
     # ========================================================
-    # HERO
+    # HERO SECTION
     # ========================================================
 
     st.markdown(
@@ -631,471 +639,13 @@ if not st.session_state.logged_in:
 
 
     # ========================================================
-    # INTRODUCTION
+    # SIGN IN / SIGN UP TABS
     # ========================================================
-
-    st.subheader(
-        "About the Application"
-    )
-
-    st.write(
-        """
-        Heart Disease Risk Predictor is a machine-learning application
-        designed to estimate cardiovascular risk based on patient health
-        information.
-
-        The application analyses patient data using multiple machine-learning
-        models and provides a risk probability, risk classification,
-        health alerts and personalised recommendations.
-
-        This application is intended for educational and demonstration
-        purposes and should not be used as a medical diagnostic tool.
-        """
-    )
-
-
-    # ========================================================
-    # DATASET ANALYTICS
-    # ========================================================
-
-    st.divider()
-
-    st.header(
-        "Dataset Analytics"
-    )
-
-    st.write(
-        "Overview of the dataset used to train and evaluate the machine-learning models."
-    )
-
-
-    # --------------------------------------------------------
-    # DATASET METRICS
-    # --------------------------------------------------------
-
-    metric1, metric2, metric3, metric4 = st.columns(4)
-
-
-    with metric1:
-
-        st.metric(
-            "Patient Records",
-            f"{total_patients:,}"
-        )
-
-
-    with metric2:
-
-        st.metric(
-            "Features",
-            total_features
-        )
-
-
-    with metric3:
-
-        st.metric(
-            "Average Age",
-            f"{average_age:.1f}"
-        )
-
-
-    with metric4:
-
-        st.metric(
-            "Average Cholesterol",
-            f"{average_cholesterol:.1f}"
-        )
-
-
-    metric5, metric6 = st.columns(2)
-
-
-    with metric5:
-
-        st.metric(
-            "Average Blood Pressure",
-            f"{average_blood_pressure:.1f} mm Hg"
-        )
-
-
-    with metric6:
-
-        st.metric(
-            "Positive Cases",
-            f"{positive_cases:,}"
-        )
-
-
-    # ========================================================
-    # TARGET DISTRIBUTION
-    # ========================================================
-
-    st.subheader(
-        "Heart Disease Target Distribution"
-    )
-
-    target_col1, target_col2 = st.columns(2)
-
-
-    with target_col1:
-
-        st.write(
-            f"**Positive cases:** {positive_cases:,} "
-            f"({positive_percentage:.1f}%)"
-        )
-
-        st.write(
-            f"**Negative cases:** {negative_cases:,} "
-            f"({negative_percentage:.1f}%)"
-        )
-
-
-    with target_col2:
-
-        target_counts = pd.DataFrame(
-            {
-                "Outcome": [
-                    "Negative",
-                    "Positive"
-                ],
-                "Patients": [
-                    negative_cases,
-                    positive_cases
-                ]
-            }
-        )
-
-        fig_target, ax_target = plt.subplots(
-            figsize=(5, 3)
-        )
-
-        ax_target.bar(
-            target_counts["Outcome"],
-            target_counts["Patients"]
-        )
-
-        ax_target.set_ylabel(
-            "Number of Patients"
-        )
-
-        ax_target.set_title(
-            "Target Distribution"
-        )
-
-        st.pyplot(
-            fig_target
-        )
-
-        plt.close(
-            fig_target
-        )
-
-
-    # ========================================================
-    # MODEL PERFORMANCE
-    # ========================================================
-
-    st.divider()
-
-    st.header(
-        "Model Performance"
-    )
-
-    st.write(
-        "The application trains and compares three machine-learning models using the same dataset."
-    )
-
-
-    model_col1, model_col2, model_col3 = st.columns(3)
-
-
-    # --------------------------------------------------------
-    # RANDOM FOREST
-    # --------------------------------------------------------
-
-    with model_col1:
-
-        rf_accuracy = all_results[
-            "Random Forest"
-        ]["accuracy"]
-
-        st.markdown(
-            f"""
-<div class="model-card">
-
-    <div class="model-name">
-        Random Forest
-    </div>
-
-    <div class="model-score">
-        {rf_accuracy:.1%}
-    </div>
-
-    <p>
-        Ensemble classification model using multiple decision trees.
-    </p>
-
-</div>
-""",
-            unsafe_allow_html=True
-        )
-
-
-    # --------------------------------------------------------
-    # GRADIENT BOOSTING
-    # --------------------------------------------------------
-
-    with model_col2:
-
-        gb_accuracy = all_results[
-            "Gradient Boosting"
-        ]["accuracy"]
-
-        st.markdown(
-            f"""
-<div class="model-card">
-
-    <div class="model-name">
-        Gradient Boosting
-    </div>
-
-    <div class="model-score">
-        {gb_accuracy:.1%}
-    </div>
-
-    <p>
-        Sequential ensemble model designed to improve prediction performance.
-    </p>
-
-</div>
-""",
-            unsafe_allow_html=True
-        )
-
-
-    # --------------------------------------------------------
-    # LOGISTIC REGRESSION
-    # --------------------------------------------------------
-
-    with model_col3:
-
-        lr_accuracy = all_results[
-            "Logistic Regression"
-        ]["accuracy"]
-
-        st.markdown(
-            f"""
-<div class="model-card">
-
-    <div class="model-name">
-        Logistic Regression
-    </div>
-
-    <div class="model-score">
-        {lr_accuracy:.1%}
-    </div>
-
-    <p>
-        Statistical classification model used for binary prediction.
-    </p>
-
-</div>
-""",
-            unsafe_allow_html=True
-        )
-
-
-    st.success(
-        f"Best-performing model: {best_name} "
-        f"with an accuracy of {all_results[best_name]['accuracy']:.1%}."
-    )
-
-
-    # ========================================================
-    # MODEL COMPARISON CHART
-    # ========================================================
-
-    st.subheader(
-        "Model Accuracy Comparison"
-    )
-
-    model_names = list(
-        all_results.keys()
-    )
-
-    model_accuracies = [
-        all_results[name]["accuracy"] * 100
-        for name in model_names
-    ]
-
-    comparison_df = pd.DataFrame(
-        {
-            "Model": model_names,
-            "Accuracy": model_accuracies
-        }
-    )
-
-    fig_models, ax_models = plt.subplots(
-        figsize=(8, 4)
-    )
-
-    ax_models.bar(
-        comparison_df["Model"],
-        comparison_df["Accuracy"]
-    )
-
-    ax_models.set_ylabel(
-        "Accuracy (%)"
-    )
-
-    ax_models.set_ylim(
-        0,
-        100
-    )
-
-    ax_models.set_title(
-        "Machine Learning Model Performance"
-    )
-
-    for index, value in enumerate(model_accuracies):
-
-        ax_models.text(
-            index,
-            value + 1,
-            f"{value:.1f}%",
-            ha="center"
-        )
-
-    st.pyplot(
-        fig_models
-    )
-
-    plt.close(
-        fig_models
-    )
-
-
-    # ========================================================
-    # HOW IT WORKS
-    # ========================================================
-
-    st.divider()
-
-    st.header(
-        "How It Works"
-    )
-
-    step1, step2, step3, step4 = st.columns(4)
-
-
-    with step1:
-
-        st.markdown(
-            """
-<div class="step-card">
-
-    <div class="step-number">
-        1
-    </div>
-
-    <h4>Enter Information</h4>
-
-    <p>
-        Provide patient health information.
-    </p>
-
-</div>
-""",
-            unsafe_allow_html=True
-        )
-
-
-    with step2:
-
-        st.markdown(
-            """
-<div class="step-card">
-
-    <div class="step-number">
-        2
-    </div>
-
-    <h4>AI Analysis</h4>
-
-    <p>
-        The selected machine-learning model analyses the information.
-    </p>
-
-</div>
-""",
-            unsafe_allow_html=True
-        )
-
-
-    with step3:
-
-        st.markdown(
-            """
-<div class="step-card">
-
-    <div class="step-number">
-        3
-    </div>
-
-    <h4>Risk Prediction</h4>
-
-    <p>
-        The system calculates an estimated risk probability.
-    </p>
-
-</div>
-""",
-            unsafe_allow_html=True
-        )
-
-
-    with step4:
-
-        st.markdown(
-            """
-<div class="step-card">
-
-    <div class="step-number">
-        4
-    </div>
-
-    <h4>View Results</h4>
-
-    <p>
-        Review the risk level, alerts and recommendations.
-    </p>
-
-</div>
-""",
-            unsafe_allow_html=True
-        )
-
-
-    # ========================================================
-    # SIGN IN / SIGN UP
-    # ========================================================
-
-    st.divider()
-
-    st.header(
-        "Get Started"
-    )
-
-    st.write(
-        "Create an account or sign in to perform a heart disease risk assessment and save your results."
-    )
-
 
     tab1, tab2 = st.tabs(
         [
             "Sign In",
-            "Create Account"
+            "Sign Up"
         ]
     )
 
@@ -1106,20 +656,19 @@ if not st.session_state.logged_in:
 
     with tab1:
 
-        st.subheader(
+        st.header(
             "Welcome Back"
         )
 
         st.write(
-            "Sign in to access your assessments and prediction history."
+            "Sign in to access your health assessments "
+            "and prediction history."
         )
-
 
         username = st.text_input(
             "Username",
             key="login_username"
         )
-
 
         password = st.text_input(
             "Password",
@@ -1127,35 +676,40 @@ if not st.session_state.logged_in:
             key="login_password"
         )
 
-
         if st.button(
             "Sign In",
             use_container_width=True,
             type="primary"
         ):
 
-            user = login_user(
-                username,
-                password
-            )
+            if not username or not password:
 
-
-            if user:
-
-                st.session_state.logged_in = True
-
-                st.session_state.user_id = user[0]
-
-                st.session_state.username = user[1]
-
-                st.rerun()
-
+                st.error(
+                    "Please enter your username and password."
+                )
 
             else:
 
-                st.error(
-                    "Invalid username or password."
+                user = login_user(
+                    username,
+                    password
                 )
+
+                if user:
+
+                    st.session_state.logged_in = True
+
+                    st.session_state.user_id = user[0]
+
+                    st.session_state.username = user[1]
+
+                    st.rerun()
+
+                else:
+
+                    st.error(
+                        "Invalid username or password."
+                    )
 
 
     # ========================================================
@@ -1164,26 +718,24 @@ if not st.session_state.logged_in:
 
     with tab2:
 
-        st.subheader(
+        st.header(
             "Create Your Account"
         )
 
         st.write(
-            "Create an account to save and track your assessments."
+            "Create an account to save and track your "
+            "heart disease assessments."
         )
-
 
         username = st.text_input(
             "Username",
             key="register_username"
         )
 
-
         email = st.text_input(
             "Email",
             key="register_email"
         )
-
 
         password = st.text_input(
             "Password",
@@ -1191,13 +743,11 @@ if not st.session_state.logged_in:
             key="register_password"
         )
 
-
         confirm_password = st.text_input(
             "Confirm Password",
             type="password",
             key="register_confirm"
         )
-
 
         if st.button(
             "Create Account",
@@ -1211,7 +761,6 @@ if not st.session_state.logged_in:
                     "Passwords do not match."
                 )
 
-
             else:
 
                 success, message = register_user(
@@ -1219,7 +768,6 @@ if not st.session_state.logged_in:
                     email,
                     password
                 )
-
 
                 if success:
 
@@ -1230,7 +778,6 @@ if not st.session_state.logged_in:
                     st.info(
                         "You can now sign in using the Sign In tab."
                     )
-
 
                 else:
 
@@ -1246,18 +793,17 @@ if not st.session_state.logged_in:
 else:
 
     # ========================================================
-    # SIDEBAR
+    # SIDEBAR USER INFORMATION
     # ========================================================
-
-    st.sidebar.title(
-        "Heart Disease Predictor"
-    )
-
 
     st.sidebar.success(
         f"Welcome, {st.session_state.username}"
     )
 
+
+    # ========================================================
+    # SIDEBAR NAVIGATION
+    # ========================================================
 
     menu = st.sidebar.radio(
         "Dashboard",
@@ -1275,31 +821,42 @@ else:
 
     if menu == "New Assessment":
 
-        st.title(
-            "Heart Disease Risk Predictor"
+        # ----------------------------------------------------
+        # MODEL COMPARISON
+        # ----------------------------------------------------
+
+        st.sidebar.divider()
+
+        st.sidebar.header(
+            "Model Comparison"
         )
 
+        comparison_df = pd.DataFrame(
+            {
+                "Model": list(
+                    all_results.keys()
+                ),
 
-        st.write(
-            "Enter patient information below to estimate heart disease risk."
+                "Accuracy": [
+                    f"{all_results[name]['accuracy']:.1%}"
+                    for name in all_results
+                ]
+            }
         )
 
+        st.sidebar.dataframe(
+            comparison_df,
+            hide_index=True
+        )
 
-        st.info(
-            "This tool is for educational purposes only and should not replace professional medical advice."
+        st.sidebar.write(
+            f"Best performer: {best_name}"
         )
 
 
         # ----------------------------------------------------
         # MODEL SELECTOR
         # ----------------------------------------------------
-
-        st.sidebar.divider()
-
-        st.sidebar.header(
-            "Prediction Model"
-        )
-
 
         selected_model_name = st.sidebar.selectbox(
             "Choose Prediction Model",
@@ -1311,20 +868,40 @@ else:
             ).index(best_name)
         )
 
-
         model = all_results[
             selected_model_name
         ]["model"]
-
 
         accuracy = all_results[
             selected_model_name
         ]["accuracy"]
 
-
         st.sidebar.metric(
-            "Model Accuracy",
+            "Selected Model Accuracy",
             f"{accuracy:.1%}"
+        )
+
+        st.sidebar.write(
+            f"Trained on {len(df)} patient records"
+        )
+
+
+        # ====================================================
+        # MAIN CONTENT
+        # ====================================================
+
+        st.title(
+            "Heart Disease Risk Predictor"
+        )
+
+        st.write(
+            "Enter patient information below to predict "
+            "heart disease risk."
+        )
+
+        st.info(
+            "This tool is for educational purposes only "
+            "and should not replace professional medical advice."
         )
 
 
@@ -1335,7 +912,6 @@ else:
         st.header(
             "Patient Information"
         )
-
 
         col1, col2 = st.columns(2)
 
@@ -1353,7 +929,6 @@ else:
                 value=50
             )
 
-
             sex = st.selectbox(
                 "Sex",
                 options=[0, 1],
@@ -1363,6 +938,21 @@ else:
                 else "Male"
             )
 
+            height = st.number_input(
+                "Height (cm)",
+                min_value=50.0,
+                max_value=250.0,
+                value=170.0,
+                step=1.0
+            )
+
+            weight = st.number_input(
+                "Weight (kg)",
+                min_value=20.0,
+                max_value=300.0,
+                value=70.0,
+                step=1.0
+            )
 
             cp = st.selectbox(
                 "Chest Pain Type",
@@ -1375,7 +965,6 @@ else:
                 ][x]
             )
 
-
             trestbps = st.number_input(
                 "Resting Blood Pressure (mm Hg)",
                 min_value=80,
@@ -1383,14 +972,12 @@ else:
                 value=120
             )
 
-
             chol = st.number_input(
                 "Serum Cholesterol (mg/dl)",
                 min_value=100,
                 max_value=600,
                 value=200
             )
-
 
             fbs = st.selectbox(
                 "Fasting Blood Sugar > 120 mg/dl",
@@ -1400,7 +987,6 @@ else:
                 if x == 0
                 else "Yes"
             )
-
 
             restecg = st.selectbox(
                 "Resting ECG Results",
@@ -1419,13 +1005,27 @@ else:
 
         with col2:
 
+            # ------------------------------------------------
+            # BMI CALCULATION
+            # ------------------------------------------------
+
+            height_m = height / 100
+
+            bmi = weight / (
+                height_m ** 2
+            )
+
+            st.metric(
+                "Calculated BMI",
+                f"{bmi:.1f}"
+            )
+
             thalach = st.number_input(
                 "Max Heart Rate Achieved",
                 min_value=60,
                 max_value=250,
                 value=150
             )
-
 
             exang = st.selectbox(
                 "Exercise Induced Angina",
@@ -1436,7 +1036,6 @@ else:
                 else "Yes"
             )
 
-
             oldpeak = st.number_input(
                 "ST Depression (Oldpeak)",
                 min_value=0.0,
@@ -1444,7 +1043,6 @@ else:
                 value=1.0,
                 step=0.1
             )
-
 
             slope = st.selectbox(
                 "Slope of Peak Exercise ST",
@@ -1456,12 +1054,10 @@ else:
                 ][x]
             )
 
-
             ca = st.selectbox(
                 "Number of Major Vessels (0-3)",
                 options=[0, 1, 2, 3]
             )
-
 
             thal = st.selectbox(
                 "Thalassemia",
@@ -1484,7 +1080,6 @@ else:
             type="primary",
             use_container_width=True
         ):
-
 
             # ------------------------------------------------
             # CREATE INPUT DATA
@@ -1517,7 +1112,6 @@ else:
             prediction = model.predict(
                 input_data
             )[0]
-
 
             probability = model.predict_proba(
                 input_data
@@ -1568,11 +1162,14 @@ else:
                     probability,
                     age,
                     sex,
+                    height,
+                    weight,
+                    bmi,
                     cholesterol,
                     blood_pressure,
                     model
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     st.session_state.user_id,
@@ -1582,13 +1179,17 @@ else:
                     risk_level,
                     float(probability),
                     int(age),
-                    "Female" if sex == 0 else "Male",
+                    "Female"
+                    if sex == 0
+                    else "Male",
+                    float(height),
+                    float(weight),
+                    float(bmi),
                     int(chol),
                     int(trestbps),
                     selected_model_name
                 )
             )
-
 
             conn.commit()
 
@@ -1603,11 +1204,14 @@ else:
                 "Prediction Results"
             )
 
-
             st.caption(
                 f"Using: {selected_model_name}"
             )
 
+
+            # ------------------------------------------------
+            # RISK MESSAGE
+            # ------------------------------------------------
 
             if risk_level == "Low Risk":
 
@@ -1616,14 +1220,12 @@ else:
                     f"({probability:.1%} probability)"
                 )
 
-
             elif risk_level == "Moderate Risk":
 
                 st.warning(
                     f"{risk_level} of Heart Disease "
                     f"({probability:.1%} probability)"
                 )
-
 
             else:
 
@@ -1634,25 +1236,23 @@ else:
 
 
             # ------------------------------------------------
-            # RISK LEVEL
+            # PROGRESS BAR
             # ------------------------------------------------
 
             st.subheader(
-                "Risk Probability"
+                "Risk Level"
             )
-
 
             st.progress(
                 int(probability * 100)
             )
 
 
-            # ------------------------------------------------
+            # =================================================
             # METRICS
-            # ------------------------------------------------
+            # =================================================
 
             metric1, metric2, metric3 = st.columns(3)
-
 
             with metric1:
 
@@ -1661,14 +1261,12 @@ else:
                     f"{probability:.1%}"
                 )
 
-
             with metric2:
 
                 st.metric(
                     "Prediction",
                     prediction_label
                 )
-
 
             with metric3:
 
@@ -1679,13 +1277,53 @@ else:
 
 
             # =================================================
+            # BMI INFORMATION
+            # =================================================
+
+            st.subheader(
+                "Body Mass Index"
+            )
+
+            bmi_col1, bmi_col2 = st.columns(2)
+
+            with bmi_col1:
+
+                st.metric(
+                    "BMI",
+                    f"{bmi:.1f}"
+                )
+
+            with bmi_col2:
+
+                if bmi < 18.5:
+
+                    bmi_category = "Underweight"
+
+                elif bmi < 25:
+
+                    bmi_category = "Healthy Weight"
+
+                elif bmi < 30:
+
+                    bmi_category = "Overweight"
+
+                else:
+
+                    bmi_category = "Obesity"
+
+                st.metric(
+                    "BMI Category",
+                    bmi_category
+                )
+
+
+            # =================================================
             # HEALTH RECOMMENDATIONS
             # =================================================
 
             st.subheader(
                 "Health Recommendations"
             )
-
 
             if probability < 0.30:
 
@@ -1701,7 +1339,6 @@ else:
                     """
                 )
 
-
             elif probability < 0.70:
 
                 st.warning(
@@ -1715,7 +1352,6 @@ else:
                     Consult a healthcare professional.
                     """
                 )
-
 
             else:
 
@@ -1739,7 +1375,6 @@ else:
             st.subheader(
                 "Health Alerts"
             )
-
 
             alerts_found = False
 
@@ -1780,6 +1415,22 @@ else:
                 alerts_found = True
 
 
+            if bmi >= 30:
+
+                st.warning(
+                    "BMI is in the obesity range."
+                )
+
+                alerts_found = True
+
+
+            elif bmi >= 25:
+
+                st.info(
+                    "BMI is in the overweight range."
+                )
+
+
             if not alerts_found:
 
                 st.success(
@@ -1795,7 +1446,6 @@ else:
                 "Top Risk Factors"
             )
 
-
             if hasattr(
                 model,
                 "feature_importances_"
@@ -1807,7 +1457,6 @@ else:
                         "Importance": model.feature_importances_
                     }
                 )
-
 
             else:
 
@@ -1890,6 +1539,14 @@ Age: {age}
 
 Sex: {"Female" if sex == 0 else "Male"}
 
+Height: {height:.1f} cm
+
+Weight: {weight:.1f} kg
+
+BMI: {bmi:.1f}
+
+BMI Category: {bmi_category}
+
 Cholesterol: {chol} mg/dl
 
 Blood Pressure: {trestbps} mm Hg
@@ -1937,7 +1594,6 @@ It should not replace professional medical advice.
             "My Records"
         )
 
-
         st.write(
             "View your previous heart disease assessments."
         )
@@ -1951,6 +1607,9 @@ It should not replace professional medical advice.
                 probability AS Probability,
                 age AS Age,
                 sex AS Sex,
+                height AS Height_cm,
+                weight AS Weight_kg,
+                bmi AS BMI,
                 cholesterol AS Cholesterol,
                 blood_pressure AS Blood_Pressure,
                 model AS Model
@@ -1981,6 +1640,21 @@ It should not replace professional medical advice.
                 records_df["Probability"] * 100
             ).round(1)
 
+            records_df["Height_cm"] = (
+                records_df["Height_cm"]
+                .round(1)
+            )
+
+            records_df["Weight_kg"] = (
+                records_df["Weight_kg"]
+                .round(1)
+            )
+
+            records_df["BMI"] = (
+                records_df["BMI"]
+                .round(1)
+            )
+
 
             st.dataframe(
                 records_df,
@@ -1989,9 +1663,9 @@ It should not replace professional medical advice.
             )
 
 
-            # ------------------------------------------------
+            # =================================================
             # SUMMARY
-            # ------------------------------------------------
+            # =================================================
 
             st.subheader(
                 "Assessment Summary"
@@ -2059,9 +1733,9 @@ It should not replace professional medical advice.
                 )
 
 
-            # ------------------------------------------------
+            # =================================================
             # DOWNLOAD RECORDS
-            # ------------------------------------------------
+            # =================================================
 
             csv_data = records_df.to_csv(
                 index=False
@@ -2092,7 +1766,7 @@ It should not replace professional medical advice.
 
 
 # ============================================================
-# SIDEBAR FOOTER
+# LOGGED-IN SIDEBAR FOOTER
 # ============================================================
 
 if st.session_state.logged_in:
@@ -2100,5 +1774,6 @@ if st.session_state.logged_in:
     st.sidebar.divider()
 
     st.sidebar.info(
-        "This application is for educational purposes and should not replace professional medical advice."
+        "This application is for educational purposes "
+        "and should not replace professional medical advice."
     )
