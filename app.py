@@ -4,47 +4,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sqlite3
 import bcrypt
-import io
-import os
 
 from datetime import datetime
 
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
-    confusion_matrix,
-    roc_curve,
-    roc_auc_score
-)
-
-# Optional packages
-try:
-    import shap
-    SHAP_AVAILABLE = True
-except ImportError:
-    SHAP_AVAILABLE = False
-
-try:
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER
-    from reportlab.platypus import (
-        SimpleDocTemplate,
-        Paragraph,
-        Spacer,
-        Table,
-        TableStyle,
-        Image as ReportImage
-    )
-    REPORTLAB_AVAILABLE = True
-except ImportError:
-    REPORTLAB_AVAILABLE = False
+from sklearn.metrics import accuracy_score
 
 
 # ============================================================
@@ -54,8 +20,7 @@ except ImportError:
 st.set_page_config(
     page_title="Heart Disease Risk Predictor",
     page_icon="❤️",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="centered"
 )
 
 
@@ -100,44 +65,66 @@ st.markdown(
     font-size: 17px;
 }
 
-.feature-card {
+.section-card {
     background: #F8FAFC;
-    padding: 22px;
+    padding: 25px;
     border-radius: 15px;
+    margin: 15px 0;
+    border: 1px solid #E2E8F0;
+}
+
+.metric-card {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    text-align: center;
+    border: 1px solid #E2E8F0;
+}
+
+.metric-number {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1E3A8A;
+}
+
+.metric-label {
+    font-size: 14px;
+    color: #64748B;
+}
+
+.model-card {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    border: 1px solid #E2E8F0;
+    margin-bottom: 12px;
+}
+
+.model-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: #0F172A;
+}
+
+.model-score {
+    font-size: 26px;
+    font-weight: 700;
+    color: #2563EB;
+}
+
+.step-card {
+    background: #F8FAFC;
+    padding: 20px;
+    border-radius: 15px;
+    text-align: center;
     border: 1px solid #E2E8F0;
     min-height: 150px;
 }
 
-.feature-title {
-    font-size: 19px;
+.step-number {
+    font-size: 28px;
     font-weight: 700;
-    color: #0F172A;
-    margin-bottom: 8px;
-}
-
-.feature-text {
-    color: #475569;
-    font-size: 14px;
-}
-
-.metric-card {
-    background: #F8FAFC;
-    padding: 20px;
-    border-radius: 15px;
-    border: 1px solid #E2E8F0;
-}
-
-.section-card {
-    background: #FFFFFF;
-    padding: 25px;
-    border-radius: 18px;
-    border: 1px solid #E2E8F0;
-    margin-bottom: 20px;
-}
-
-.small-text {
-    color: #64748B;
-    font-size: 13px;
+    color: #2563EB;
 }
 
 </style>
@@ -147,7 +134,7 @@ st.markdown(
 
 
 # ============================================================
-# DATABASE
+# DATABASE CONNECTION
 # ============================================================
 
 conn = sqlite3.connect(
@@ -214,16 +201,13 @@ if "username" not in st.session_state:
 
 
 # ============================================================
-# USER FUNCTIONS
+# REGISTER USER
 # ============================================================
 
 def register_user(username, email, password):
 
     if not username or not email or not password:
         return False, "Please complete all fields."
-
-    if len(password) < 6:
-        return False, "Password must contain at least 6 characters."
 
     hashed_password = bcrypt.hashpw(
         password.encode("utf-8"),
@@ -243,8 +227,8 @@ def register_user(username, email, password):
             VALUES (?, ?, ?)
             """,
             (
-                username.strip(),
-                email.strip().lower(),
+                username,
+                email,
                 hashed_password
             )
         )
@@ -262,6 +246,10 @@ def register_user(username, email, password):
         return False, f"Registration error: {e}"
 
 
+# ============================================================
+# LOGIN USER
+# ============================================================
+
 def login_user(username, password):
 
     cursor.execute(
@@ -274,7 +262,7 @@ def login_user(username, password):
         FROM users
         WHERE username = ?
         """,
-        (username.strip(),)
+        (username,)
     )
 
     user = cursor.fetchone()
@@ -282,22 +270,25 @@ def login_user(username, password):
     if user is None:
         return None
 
+    stored_hash = user[3]
+
     try:
 
         if bcrypt.checkpw(
             password.encode("utf-8"),
-            user[3]
+            stored_hash
         ):
             return user
 
     except Exception:
+
         return None
 
     return None
 
 
 # ============================================================
-# LOAD DATA
+# LOAD DATASET
 # ============================================================
 
 @st.cache_data
@@ -305,11 +296,19 @@ def load_data():
 
     df = pd.read_csv("heart.csv")
 
+    # --------------------------------------------------------
+    # Clean column names
+    # --------------------------------------------------------
+
     df.columns = (
         df.columns
         .str.strip()
         .str.lower()
     )
+
+    # --------------------------------------------------------
+    # Clean text values
+    # --------------------------------------------------------
 
     for column in df.columns:
 
@@ -322,7 +321,10 @@ def load_data():
                 .str.lower()
             )
 
-    # THAL
+    # --------------------------------------------------------
+    # Convert THAL
+    # --------------------------------------------------------
+
     if "thal" in df.columns:
 
         thal_mapping = {
@@ -339,7 +341,10 @@ def load_data():
             thal_mapping
         )
 
-    # SEX
+    # --------------------------------------------------------
+    # Convert SEX
+    # --------------------------------------------------------
+
     if "sex" in df.columns:
 
         df["sex"] = df["sex"].replace(
@@ -349,7 +354,10 @@ def load_data():
             }
         )
 
-    # FBS
+    # --------------------------------------------------------
+    # Convert FBS
+    # --------------------------------------------------------
+
     if "fbs" in df.columns:
 
         df["fbs"] = df["fbs"].replace(
@@ -359,7 +367,10 @@ def load_data():
             }
         )
 
-    # EXANG
+    # --------------------------------------------------------
+    # Convert EXANG
+    # --------------------------------------------------------
+
     if "exang" in df.columns:
 
         df["exang"] = df["exang"].replace(
@@ -369,6 +380,10 @@ def load_data():
             }
         )
 
+    # --------------------------------------------------------
+    # Convert remaining columns
+    # --------------------------------------------------------
+
     for column in df.columns:
 
         df[column] = pd.to_numeric(
@@ -376,9 +391,15 @@ def load_data():
             errors="coerce"
         )
 
+    # --------------------------------------------------------
+    # Remove invalid rows
+    # --------------------------------------------------------
+
     df = df.dropna()
 
-    return df.astype(float)
+    df = df.astype(float)
+
+    return df
 
 
 # ============================================================
@@ -434,54 +455,21 @@ def train_models(_df):
             X_test
         )
 
-        probabilities = model.predict_proba(
-            X_test
-        )[:, 1]
+        accuracy = accuracy_score(
+            y_test,
+            predictions
+        )
 
         results[name] = {
-
             "model": model,
-
-            "accuracy": accuracy_score(
-                y_test,
-                predictions
-            ),
-
-            "precision": precision_score(
-                y_test,
-                predictions,
-                zero_division=0
-            ),
-
-            "recall": recall_score(
-                y_test,
-                predictions,
-                zero_division=0
-            ),
-
-            "f1": f1_score(
-                y_test,
-                predictions,
-                zero_division=0
-            ),
-
-            "auc": roc_auc_score(
-                y_test,
-                probabilities
-            ),
-
-            "y_test": y_test,
-
-            "predictions": predictions,
-
-            "probabilities": probabilities
+            "accuracy": accuracy
         }
 
     return results, X.columns.tolist()
 
 
 # ============================================================
-# LOAD DATA
+# LOAD HEART DISEASE DATA
 # ============================================================
 
 try:
@@ -538,7 +526,7 @@ missing_columns = [
 if missing_columns:
 
     st.error(
-        "Missing columns: "
+        "The following columns are missing from heart.csv: "
         + ", ".join(missing_columns)
     )
 
@@ -546,21 +534,27 @@ if missing_columns:
 
 
 # ============================================================
-# TRAIN
+# TRAIN MODELS
 # ============================================================
 
 try:
 
-    all_results, feature_names = train_models(df)
+    all_results, feature_names = train_models(
+        df
+    )
 
 except Exception as e:
 
     st.error(
-        f"Error training models: {e}"
+        f"Error training the machine learning models: {e}"
     )
 
     st.stop()
 
+
+# ============================================================
+# BEST MODEL
+# ============================================================
 
 best_name = max(
     all_results,
@@ -569,312 +563,542 @@ best_name = max(
 
 
 # ============================================================
-# HELPER FUNCTIONS
+# DATASET ANALYTICS
 # ============================================================
 
-def calculate_bmi(weight, height):
+total_patients = len(df)
 
-    if height <= 0:
-        return 0
+total_features = len(
+    df.drop(
+        "target",
+        axis=1
+    ).columns
+)
 
-    height_m = height / 100
+average_age = df["age"].mean()
 
-    return weight / (height_m ** 2)
+average_cholesterol = df["chol"].mean()
 
+average_blood_pressure = df["trestbps"].mean()
 
-def bmi_category(bmi):
+positive_cases = int(
+    (df["target"] == 1).sum()
+)
 
-    if bmi < 18.5:
-        return "Underweight"
+negative_cases = int(
+    (df["target"] == 0).sum()
+)
 
-    elif bmi < 25:
-        return "Normal"
+positive_percentage = (
+    positive_cases / total_patients
+) * 100
 
-    elif bmi < 30:
-        return "Overweight"
-
-    else:
-        return "Obesity"
-
-
-def create_excel_file(dataframe):
-
-    output = io.BytesIO()
-
-    with pd.ExcelWriter(
-        output,
-        engine="openpyxl"
-    ) as writer:
-
-        dataframe.to_excel(
-            writer,
-            index=False,
-            sheet_name="Assessments"
-        )
-
-    return output.getvalue()
-
-
-def create_pdf_report(
-    username,
-    age,
-    sex,
-    chol,
-    trestbps,
-    prediction_label,
-    risk_level,
-    probability,
-    model_name,
-    accuracy,
-    bmi=None
-):
-
-    if not REPORTLAB_AVAILABLE:
-        return None
-
-    output = io.BytesIO()
-
-    document = SimpleDocTemplate(
-        output,
-        pagesize=A4,
-        rightMargin=40,
-        leftMargin=40,
-        topMargin=40,
-        bottomMargin=40
-    )
-
-    styles = getSampleStyleSheet()
-
-    title_style = ParagraphStyle(
-        "TitleCustom",
-        parent=styles["Title"],
-        alignment=TA_CENTER,
-        fontSize=22,
-        spaceAfter=20
-    )
-
-    heading_style = ParagraphStyle(
-        "HeadingCustom",
-        parent=styles["Heading2"],
-        fontSize=14,
-        spaceBefore=15,
-        spaceAfter=10
-    )
-
-    body_style = ParagraphStyle(
-        "BodyCustom",
-        parent=styles["BodyText"],
-        fontSize=10,
-        leading=15
-    )
-
-    elements = []
-
-    elements.append(
-        Paragraph(
-            "Heart Disease Risk Assessment",
-            title_style
-        )
-    )
-
-    elements.append(
-        Paragraph(
-            "AI-Powered Cardiovascular Risk Assessment",
-            body_style
-        )
-    )
-
-    elements.append(
-        Spacer(1, 15)
-    )
-
-    elements.append(
-        Paragraph(
-            "Patient Information",
-            heading_style
-        )
-    )
-
-    patient_data = [
-        ["Username", username],
-        ["Date", datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
-        ["Age", str(age)],
-        ["Sex", sex],
-        ["Cholesterol", f"{chol} mg/dl"],
-        ["Blood Pressure", f"{trestbps} mm Hg"]
-    ]
-
-    if bmi is not None:
-        patient_data.append(
-            ["BMI", f"{bmi:.1f}"]
-        )
-
-    table = Table(
-        patient_data,
-        colWidths=[150, 300]
-    )
-
-    table.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#E2E8F0")),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                ("PADDING", (0, 0), (-1, -1), 8)
-            ]
-        )
-    )
-
-    elements.append(table)
-
-    elements.append(
-        Paragraph(
-            "Prediction Results",
-            heading_style
-        )
-    )
-
-    prediction_data = [
-        ["Prediction", prediction_label],
-        ["Risk Level", risk_level],
-        ["Risk Probability", f"{probability:.2%}"],
-        ["Model", model_name],
-        ["Model Accuracy", f"{accuracy:.2%}"]
-    ]
-
-    result_table = Table(
-        prediction_data,
-        colWidths=[150, 300]
-    )
-
-    result_table.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#DBEAFE")),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                ("PADDING", (0, 0), (-1, -1), 8)
-            ]
-        )
-    )
-
-    elements.append(result_table)
-
-    elements.append(
-        Paragraph(
-            "Important Disclaimer",
-            heading_style
-        )
-    )
-
-    elements.append(
-        Paragraph(
-            "This application provides an educational machine-learning "
-            "risk estimate. It is not a medical diagnosis and should not "
-            "replace professional medical advice.",
-            body_style
-        )
-    )
-
-    document.build(elements)
-
-    return output.getvalue()
+negative_percentage = (
+    negative_cases / total_patients
+) * 100
 
 
 # ============================================================
-# LANDING PAGE
+# PUBLIC LANDING PAGE
 # ============================================================
 
 if not st.session_state.logged_in:
+
+    # ========================================================
+    # HERO
+    # ========================================================
 
     st.markdown(
         """
 <div class="hero-card">
 
-<div class="logo-circle">
-❤️
-</div>
+    <div class="logo-circle">
+        ❤️
+    </div>
 
-<div class="hero-title">
-Heart Disease Risk Predictor
-</div>
+    <div class="hero-title">
+        Heart Disease Risk Predictor
+    </div>
 
-<div class="hero-subtitle">
-AI-Powered Cardiovascular Risk Assessment
-</div>
+    <div class="hero-subtitle">
+        AI-Powered Cardiovascular Risk Assessment
+    </div>
 
 </div>
 """,
         unsafe_allow_html=True
     )
 
-    # Features
 
-    col1, col2, col3 = st.columns(3)
+    # ========================================================
+    # INTRODUCTION
+    # ========================================================
 
-    with col1:
+    st.subheader(
+        "About the Application"
+    )
+
+    st.write(
+        """
+        Heart Disease Risk Predictor is a machine-learning application
+        designed to estimate cardiovascular risk based on patient health
+        information.
+
+        The application analyses patient data using multiple machine-learning
+        models and provides a risk probability, risk classification,
+        health alerts and personalised recommendations.
+
+        This application is intended for educational and demonstration
+        purposes and should not be used as a medical diagnostic tool.
+        """
+    )
+
+
+    # ========================================================
+    # DATASET ANALYTICS
+    # ========================================================
+
+    st.divider()
+
+    st.header(
+        "Dataset Analytics"
+    )
+
+    st.write(
+        "Overview of the dataset used to train and evaluate the machine-learning models."
+    )
+
+
+    # --------------------------------------------------------
+    # DATASET METRICS
+    # --------------------------------------------------------
+
+    metric1, metric2, metric3, metric4 = st.columns(4)
+
+
+    with metric1:
+
+        st.metric(
+            "Patient Records",
+            f"{total_patients:,}"
+        )
+
+
+    with metric2:
+
+        st.metric(
+            "Features",
+            total_features
+        )
+
+
+    with metric3:
+
+        st.metric(
+            "Average Age",
+            f"{average_age:.1f}"
+        )
+
+
+    with metric4:
+
+        st.metric(
+            "Average Cholesterol",
+            f"{average_cholesterol:.1f}"
+        )
+
+
+    metric5, metric6 = st.columns(2)
+
+
+    with metric5:
+
+        st.metric(
+            "Average Blood Pressure",
+            f"{average_blood_pressure:.1f} mm Hg"
+        )
+
+
+    with metric6:
+
+        st.metric(
+            "Positive Cases",
+            f"{positive_cases:,}"
+        )
+
+
+    # ========================================================
+    # TARGET DISTRIBUTION
+    # ========================================================
+
+    st.subheader(
+        "Heart Disease Target Distribution"
+    )
+
+    target_col1, target_col2 = st.columns(2)
+
+
+    with target_col1:
+
+        st.write(
+            f"**Positive cases:** {positive_cases:,} "
+            f"({positive_percentage:.1f}%)"
+        )
+
+        st.write(
+            f"**Negative cases:** {negative_cases:,} "
+            f"({negative_percentage:.1f}%)"
+        )
+
+
+    with target_col2:
+
+        target_counts = pd.DataFrame(
+            {
+                "Outcome": [
+                    "Negative",
+                    "Positive"
+                ],
+                "Patients": [
+                    negative_cases,
+                    positive_cases
+                ]
+            }
+        )
+
+        fig_target, ax_target = plt.subplots(
+            figsize=(5, 3)
+        )
+
+        ax_target.bar(
+            target_counts["Outcome"],
+            target_counts["Patients"]
+        )
+
+        ax_target.set_ylabel(
+            "Number of Patients"
+        )
+
+        ax_target.set_title(
+            "Target Distribution"
+        )
+
+        st.pyplot(
+            fig_target
+        )
+
+        plt.close(
+            fig_target
+        )
+
+
+    # ========================================================
+    # MODEL PERFORMANCE
+    # ========================================================
+
+    st.divider()
+
+    st.header(
+        "Model Performance"
+    )
+
+    st.write(
+        "The application trains and compares three machine-learning models using the same dataset."
+    )
+
+
+    model_col1, model_col2, model_col3 = st.columns(3)
+
+
+    # --------------------------------------------------------
+    # RANDOM FOREST
+    # --------------------------------------------------------
+
+    with model_col1:
+
+        rf_accuracy = all_results[
+            "Random Forest"
+        ]["accuracy"]
 
         st.markdown(
-            """
-<div class="feature-card">
+            f"""
+<div class="model-card">
 
-<div class="feature-title">
-🤖 AI Prediction
-</div>
+    <div class="model-name">
+        Random Forest
+    </div>
 
-<div class="feature-text">
-Use multiple machine-learning models to estimate cardiovascular risk.
-</div>
+    <div class="model-score">
+        {rf_accuracy:.1%}
+    </div>
+
+    <p>
+        Ensemble classification model using multiple decision trees.
+    </p>
 
 </div>
 """,
             unsafe_allow_html=True
         )
 
-    with col2:
+
+    # --------------------------------------------------------
+    # GRADIENT BOOSTING
+    # --------------------------------------------------------
+
+    with model_col2:
+
+        gb_accuracy = all_results[
+            "Gradient Boosting"
+        ]["accuracy"]
 
         st.markdown(
-            """
-<div class="feature-card">
+            f"""
+<div class="model-card">
 
-<div class="feature-title">
-📊 Risk Analysis
-</div>
+    <div class="model-name">
+        Gradient Boosting
+    </div>
 
-<div class="feature-text">
-Understand risk probability, important factors and health alerts.
-</div>
+    <div class="model-score">
+        {gb_accuracy:.1%}
+    </div>
+
+    <p>
+        Sequential ensemble model designed to improve prediction performance.
+    </p>
 
 </div>
 """,
             unsafe_allow_html=True
         )
 
-    with col3:
+
+    # --------------------------------------------------------
+    # LOGISTIC REGRESSION
+    # --------------------------------------------------------
+
+    with model_col3:
+
+        lr_accuracy = all_results[
+            "Logistic Regression"
+        ]["accuracy"]
 
         st.markdown(
-            """
-<div class="feature-card">
+            f"""
+<div class="model-card">
 
-<div class="feature-title">
-📈 Track Progress
-</div>
+    <div class="model-name">
+        Logistic Regression
+    </div>
 
-<div class="feature-text">
-Save assessments and monitor your risk history over time.
-</div>
+    <div class="model-score">
+        {lr_accuracy:.1%}
+    </div>
+
+    <p>
+        Statistical classification model used for binary prediction.
+    </p>
 
 </div>
 """,
             unsafe_allow_html=True
         )
 
-    st.write("")
+
+    st.success(
+        f"Best-performing model: {best_name} "
+        f"with an accuracy of {all_results[best_name]['accuracy']:.1%}."
+    )
+
+
+    # ========================================================
+    # MODEL COMPARISON CHART
+    # ========================================================
+
+    st.subheader(
+        "Model Accuracy Comparison"
+    )
+
+    model_names = list(
+        all_results.keys()
+    )
+
+    model_accuracies = [
+        all_results[name]["accuracy"] * 100
+        for name in model_names
+    ]
+
+    comparison_df = pd.DataFrame(
+        {
+            "Model": model_names,
+            "Accuracy": model_accuracies
+        }
+    )
+
+    fig_models, ax_models = plt.subplots(
+        figsize=(8, 4)
+    )
+
+    ax_models.bar(
+        comparison_df["Model"],
+        comparison_df["Accuracy"]
+    )
+
+    ax_models.set_ylabel(
+        "Accuracy (%)"
+    )
+
+    ax_models.set_ylim(
+        0,
+        100
+    )
+
+    ax_models.set_title(
+        "Machine Learning Model Performance"
+    )
+
+    for index, value in enumerate(model_accuracies):
+
+        ax_models.text(
+            index,
+            value + 1,
+            f"{value:.1f}%",
+            ha="center"
+        )
+
+    st.pyplot(
+        fig_models
+    )
+
+    plt.close(
+        fig_models
+    )
+
+
+    # ========================================================
+    # HOW IT WORKS
+    # ========================================================
+
+    st.divider()
+
+    st.header(
+        "How It Works"
+    )
+
+    step1, step2, step3, step4 = st.columns(4)
+
+
+    with step1:
+
+        st.markdown(
+            """
+<div class="step-card">
+
+    <div class="step-number">
+        1
+    </div>
+
+    <h4>Enter Information</h4>
+
+    <p>
+        Provide patient health information.
+    </p>
+
+</div>
+""",
+            unsafe_allow_html=True
+        )
+
+
+    with step2:
+
+        st.markdown(
+            """
+<div class="step-card">
+
+    <div class="step-number">
+        2
+    </div>
+
+    <h4>AI Analysis</h4>
+
+    <p>
+        The selected machine-learning model analyses the information.
+    </p>
+
+</div>
+""",
+            unsafe_allow_html=True
+        )
+
+
+    with step3:
+
+        st.markdown(
+            """
+<div class="step-card">
+
+    <div class="step-number">
+        3
+    </div>
+
+    <h4>Risk Prediction</h4>
+
+    <p>
+        The system calculates an estimated risk probability.
+    </p>
+
+</div>
+""",
+            unsafe_allow_html=True
+        )
+
+
+    with step4:
+
+        st.markdown(
+            """
+<div class="step-card">
+
+    <div class="step-number">
+        4
+    </div>
+
+    <h4>View Results</h4>
+
+    <p>
+        Review the risk level, alerts and recommendations.
+    </p>
+
+</div>
+""",
+            unsafe_allow_html=True
+        )
+
+
+    # ========================================================
+    # SIGN IN / SIGN UP
+    # ========================================================
+
+    st.divider()
+
+    st.header(
+        "Get Started"
+    )
+
+    st.write(
+        "Create an account or sign in to perform a heart disease risk assessment and save your results."
+    )
+
 
     tab1, tab2 = st.tabs(
         [
             "Sign In",
-            "Sign Up"
+            "Create Account"
         ]
     )
+
 
     # ========================================================
     # SIGN IN
@@ -887,19 +1111,22 @@ Save assessments and monitor your risk history over time.
         )
 
         st.write(
-            "Sign in to access your health assessments and prediction history."
+            "Sign in to access your assessments and prediction history."
         )
+
 
         username = st.text_input(
             "Username",
             key="login_username"
         )
 
+
         password = st.text_input(
             "Password",
             type="password",
             key="login_password"
         )
+
 
         if st.button(
             "Sign In",
@@ -912,19 +1139,24 @@ Save assessments and monitor your risk history over time.
                 password
             )
 
+
             if user:
 
                 st.session_state.logged_in = True
+
                 st.session_state.user_id = user[0]
+
                 st.session_state.username = user[1]
 
                 st.rerun()
+
 
             else:
 
                 st.error(
                     "Invalid username or password."
                 )
+
 
     # ========================================================
     # SIGN UP
@@ -940,15 +1172,18 @@ Save assessments and monitor your risk history over time.
             "Create an account to save and track your assessments."
         )
 
+
         username = st.text_input(
             "Username",
             key="register_username"
         )
 
+
         email = st.text_input(
             "Email",
             key="register_email"
         )
+
 
         password = st.text_input(
             "Password",
@@ -956,11 +1191,13 @@ Save assessments and monitor your risk history over time.
             key="register_password"
         )
 
+
         confirm_password = st.text_input(
             "Confirm Password",
             type="password",
             key="register_confirm"
         )
+
 
         if st.button(
             "Create Account",
@@ -974,6 +1211,7 @@ Save assessments and monitor your risk history over time.
                     "Passwords do not match."
                 )
 
+
             else:
 
                 success, message = register_user(
@@ -982,15 +1220,17 @@ Save assessments and monitor your risk history over time.
                     password
                 )
 
+
                 if success:
 
                     st.success(
-                        message
+                        "Account created successfully."
                     )
 
                     st.info(
-                        "You can now sign in."
+                        "You can now sign in using the Sign In tab."
                     )
+
 
                 else:
 
@@ -998,1461 +1238,867 @@ Save assessments and monitor your risk history over time.
                         message
                     )
 
-    st.stop()
-
 
 # ============================================================
 # LOGGED-IN APPLICATION
 # ============================================================
 
-st.sidebar.title(
-    "❤️ Heart Disease Predictor"
-)
+else:
 
-st.sidebar.success(
-    f"Welcome, {st.session_state.username}"
-)
+    # ========================================================
+    # SIDEBAR
+    # ========================================================
 
-
-# ============================================================
-# SIDEBAR MENU
-# ============================================================
-
-menu = st.sidebar.radio(
-    "Dashboard",
-    [
-        "🏠 Dashboard",
-        "🩺 New Assessment",
-        "📈 Risk History",
-        "🧠 Model Performance",
-        "🔬 Dataset Analytics",
-        "👤 My Profile",
-        "🚪 Logout"
-    ]
-)
-
-
-# ============================================================
-# DASHBOARD
-# ============================================================
-
-if menu == "🏠 Dashboard":
-
-    st.title(
-        "Dashboard"
+    st.sidebar.title(
+        "Heart Disease Predictor"
     )
 
-    st.write(
-        "Your cardiovascular risk assessment overview."
+
+    st.sidebar.success(
+        f"Welcome, {st.session_state.username}"
     )
 
-    records_df = pd.read_sql_query(
-        """
-        SELECT *
-        FROM predictions
-        WHERE user_id = ?
-        ORDER BY prediction_date DESC
-        """,
-        conn,
-        params=(
-            st.session_state.user_id,
+
+    menu = st.sidebar.radio(
+        "Dashboard",
+        [
+            "New Assessment",
+            "My Records",
+            "Logout"
+        ]
+    )
+
+
+    # ========================================================
+    # NEW ASSESSMENT
+    # ========================================================
+
+    if menu == "New Assessment":
+
+        st.title(
+            "Heart Disease Risk Predictor"
         )
-    )
 
-    if records_df.empty:
+
+        st.write(
+            "Enter patient information below to estimate heart disease risk."
+        )
+
 
         st.info(
-            "You haven't completed an assessment yet."
+            "This tool is for educational purposes only and should not replace professional medical advice."
         )
 
-        st.button(
-            "Start Your First Assessment",
-            type="primary"
-        )
-
-    else:
-
-        total = len(records_df)
-
-        average_probability = (
-            records_df["probability"].mean()
-        )
-
-        latest = records_df.iloc[0]
-
-        high = len(
-            records_df[
-                records_df["prediction"] == "High Risk"
-            ]
-        )
-
-        moderate = len(
-            records_df[
-                records_df["prediction"] == "Moderate Risk"
-            ]
-        )
-
-        low = len(
-            records_df[
-                records_df["prediction"] == "Low Risk"
-            ]
-        )
-
-        col1, col2, col3, col4 = st.columns(4)
-
-        with col1:
-
-            st.metric(
-                "Assessments",
-                total
-            )
-
-        with col2:
-
-            st.metric(
-                "Average Risk",
-                f"{average_probability:.1%}"
-            )
-
-        with col3:
-
-            st.metric(
-                "Latest Risk",
-                latest["prediction"]
-            )
-
-        with col4:
-
-            st.metric(
-                "High Risk",
-                high
-            )
-
-        st.divider()
-
-        st.subheader(
-            "Risk Distribution"
-        )
-
-        chart_data = pd.DataFrame(
-            {
-                "Risk Level": [
-                    "Low Risk",
-                    "Moderate Risk",
-                    "High Risk"
-                ],
-                "Assessments": [
-                    low,
-                    moderate,
-                    high
-                ]
-            }
-        )
-
-        st.bar_chart(
-            chart_data.set_index("Risk Level")
-        )
-
-        st.subheader(
-            "Risk History"
-        )
-
-        history = records_df.copy()
-
-        history["prediction_date"] = pd.to_datetime(
-            history["prediction_date"]
-        )
-
-        history = history.sort_values(
-            "prediction_date"
-        )
-
-        st.line_chart(
-            history.set_index(
-                "prediction_date"
-            )["probability"]
-        )
-
-
-# ============================================================
-# NEW ASSESSMENT
-# ============================================================
-
-elif menu == "🩺 New Assessment":
-
-    st.title(
-        "New Risk Assessment"
-    )
-
-    st.info(
-        "This application provides an educational AI-generated risk estimate "
-        "and should not replace professional medical advice."
-    )
-
-    # --------------------------------------------------------
-    # MODEL SELECTION
-    # --------------------------------------------------------
-
-    selected_model_name = st.selectbox(
-        "Choose Prediction Model",
-        list(all_results.keys()),
-        index=list(
-            all_results.keys()
-        ).index(best_name)
-    )
-
-    model = all_results[
-        selected_model_name
-    ]["model"]
-
-    accuracy = all_results[
-        selected_model_name
-    ]["accuracy"]
-
-    st.caption(
-        f"Selected model accuracy: {accuracy:.1%}"
-    )
-
-    # --------------------------------------------------------
-    # PATIENT INFORMATION
-    # --------------------------------------------------------
-
-    st.header(
-        "Patient Information"
-    )
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-
-        age = st.number_input(
-            "Age",
-            min_value=1,
-            max_value=120,
-            value=50
-        )
-
-        sex = st.selectbox(
-            "Sex",
-            [0, 1],
-            format_func=lambda x:
-            "Female" if x == 0 else "Male"
-        )
-
-        cp = st.selectbox(
-            "Chest Pain Type",
-            [0, 1, 2, 3],
-            format_func=lambda x: [
-                "Typical Angina",
-                "Atypical Angina",
-                "Non-anginal Pain",
-                "Asymptomatic"
-            ][x]
-        )
-
-        trestbps = st.number_input(
-            "Resting Blood Pressure (mm Hg)",
-            min_value=80,
-            max_value=250,
-            value=120
-        )
-
-        chol = st.number_input(
-            "Serum Cholesterol (mg/dl)",
-            min_value=100,
-            max_value=600,
-            value=200
-        )
-
-        fbs = st.selectbox(
-            "Fasting Blood Sugar > 120 mg/dl",
-            [0, 1],
-            format_func=lambda x:
-            "No" if x == 0 else "Yes"
-        )
-
-        restecg = st.selectbox(
-            "Resting ECG Results",
-            [0, 1, 2],
-            format_func=lambda x: [
-                "Normal",
-                "ST-T Abnormality",
-                "Left Ventricular Hypertrophy"
-            ][x]
-        )
-
-    with col2:
-
-        thalach = st.number_input(
-            "Max Heart Rate Achieved",
-            min_value=60,
-            max_value=250,
-            value=150
-        )
-
-        exang = st.selectbox(
-            "Exercise Induced Angina",
-            [0, 1],
-            format_func=lambda x:
-            "No" if x == 0 else "Yes"
-        )
-
-        oldpeak = st.number_input(
-            "ST Depression (Oldpeak)",
-            min_value=0.0,
-            max_value=10.0,
-            value=1.0,
-            step=0.1
-        )
-
-        slope = st.selectbox(
-            "Slope of Peak Exercise ST",
-            [0, 1, 2],
-            format_func=lambda x: [
-                "Upsloping",
-                "Flat",
-                "Downsloping"
-            ][x]
-        )
-
-        ca = st.selectbox(
-            "Number of Major Vessels (0-3)",
-            [0, 1, 2, 3]
-        )
-
-        thal = st.selectbox(
-            "Thalassemia",
-            [0, 1, 2, 3],
-            format_func=lambda x: [
-                "Normal",
-                "Fixed Defect",
-                "Reversible Defect",
-                "Unknown"
-            ][x]
-        )
-
-    # --------------------------------------------------------
-    # OPTIONAL BMI
-    # --------------------------------------------------------
-
-    st.subheader(
-        "Optional BMI Information"
-    )
-
-    bmi_col1, bmi_col2 = st.columns(2)
-
-    with bmi_col1:
-
-        height = st.number_input(
-            "Height (cm)",
-            min_value=50.0,
-            max_value=250.0,
-            value=170.0
-        )
-
-    with bmi_col2:
-
-        weight = st.number_input(
-            "Weight (kg)",
-            min_value=20.0,
-            max_value=300.0,
-            value=70.0
-        )
-
-    bmi = calculate_bmi(
-        weight,
-        height
-    )
-
-    st.metric(
-        "BMI",
-        f"{bmi:.1f}"
-    )
-
-    st.caption(
-        f"BMI Category: {bmi_category(bmi)}"
-    )
-
-    # --------------------------------------------------------
-    # PREDICT
-    # --------------------------------------------------------
-
-    if st.button(
-        "Predict Risk",
-        type="primary",
-        use_container_width=True
-    ):
-
-        input_data = pd.DataFrame(
-            [[
-                age,
-                sex,
-                cp,
-                trestbps,
-                chol,
-                fbs,
-                restecg,
-                thalach,
-                exang,
-                oldpeak,
-                slope,
-                ca,
-                thal
-            ]],
-            columns=feature_names
-        )
-
-        prediction = model.predict(
-            input_data
-        )[0]
-
-        probability = model.predict_proba(
-            input_data
-        )[0][1]
-
-        prediction_label = (
-            "Positive"
-            if prediction == 1
-            else "Negative"
-        )
-
-        if probability < 0.30:
-
-            risk_level = "Low Risk"
-
-        elif probability < 0.70:
-
-            risk_level = "Moderate Risk"
-
-        else:
-
-            risk_level = "High Risk"
 
         # ----------------------------------------------------
-        # SAVE
+        # MODEL SELECTOR
         # ----------------------------------------------------
 
-        cursor.execute(
-            """
-            INSERT INTO predictions
-            (
-                user_id,
-                prediction_date,
-                prediction,
-                probability,
-                age,
-                sex,
-                cholesterol,
-                blood_pressure,
-                model
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                st.session_state.user_id,
-                datetime.now().strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                ),
-                risk_level,
-                float(probability),
-                int(age),
-                "Female" if sex == 0 else "Male",
-                int(chol),
-                int(trestbps),
-                selected_model_name
-            )
+        st.sidebar.divider()
+
+        st.sidebar.header(
+            "Prediction Model"
         )
 
-        conn.commit()
 
-        # ----------------------------------------------------
-        # RESULTS
-        # ----------------------------------------------------
+        selected_model_name = st.sidebar.selectbox(
+            "Choose Prediction Model",
+            options=list(
+                all_results.keys()
+            ),
+            index=list(
+                all_results.keys()
+            ).index(best_name)
+        )
 
-        st.divider()
+
+        model = all_results[
+            selected_model_name
+        ]["model"]
+
+
+        accuracy = all_results[
+            selected_model_name
+        ]["accuracy"]
+
+
+        st.sidebar.metric(
+            "Model Accuracy",
+            f"{accuracy:.1%}"
+        )
+
+
+        # ====================================================
+        # PATIENT INFORMATION
+        # ====================================================
 
         st.header(
-            "Prediction Results"
+            "Patient Information"
         )
 
-        if risk_level == "Low Risk":
-
-            st.success(
-                f"Low Risk — {probability:.1%} estimated probability"
-            )
-
-        elif risk_level == "Moderate Risk":
-
-            st.warning(
-                f"Moderate Risk — {probability:.1%} estimated probability"
-            )
-
-        else:
-
-            st.error(
-                f"High Risk — {probability:.1%} estimated probability"
-            )
-
-        metric1, metric2, metric3 = st.columns(3)
-
-        with metric1:
-
-            st.metric(
-                "Risk Probability",
-                f"{probability:.1%}"
-            )
-
-        with metric2:
-
-            st.metric(
-                "Prediction",
-                prediction_label
-            )
-
-        with metric3:
-
-            st.metric(
-                "Model Accuracy",
-                f"{accuracy:.1%}"
-            )
-
-        st.progress(
-            int(probability * 100)
-        )
-
-        # ----------------------------------------------------
-        # HEALTH ALERTS
-        # ----------------------------------------------------
-
-        st.subheader(
-            "Health Alerts"
-        )
-
-        alerts_found = False
-
-        if trestbps > 140:
-
-            st.warning(
-                "Elevated resting blood pressure detected."
-            )
-
-            alerts_found = True
-
-        if chol > 240:
-
-            st.warning(
-                "Elevated cholesterol detected."
-            )
-
-            alerts_found = True
-
-        if exang == 1:
-
-            st.warning(
-                "Exercise-induced angina was reported."
-            )
-
-            alerts_found = True
-
-        if oldpeak > 2:
-
-            st.warning(
-                "Elevated ST depression detected."
-            )
-
-            alerts_found = True
-
-        if not alerts_found:
-
-            st.success(
-                "No additional input-based alerts detected."
-            )
-
-        # ----------------------------------------------------
-        # RECOMMENDATIONS
-        # ----------------------------------------------------
-
-        st.subheader(
-            "Educational Recommendations"
-        )
-
-        if probability < 0.30:
-
-            st.info(
-                """
-Continue maintaining healthy lifestyle habits.
-
-Regular physical activity, balanced nutrition,
-routine check-ups and monitoring of cardiovascular
-risk factors are recommended.
-"""
-            )
-
-        elif probability < 0.70:
-
-            st.warning(
-                """
-Consider discussing your cardiovascular risk
-factors with a qualified healthcare professional.
-
-Maintaining healthy physical activity, nutrition,
-blood pressure and cholesterol levels may be beneficial.
-"""
-            )
-
-        else:
-
-            st.error(
-                """
-Consider seeking professional medical advice regarding
-your cardiovascular risk factors.
-
-This application cannot diagnose heart disease.
-"""
-            )
-
-        # ----------------------------------------------------
-        # TOP RISK FACTORS
-        # ----------------------------------------------------
-
-        st.subheader(
-            "Top Risk Factors"
-        )
-
-        if hasattr(
-            model,
-            "feature_importances_"
-        ):
-
-            importance_values = (
-                model.feature_importances_
-            )
-
-        else:
-
-            importance_values = np.abs(
-                model.coef_[0]
-            )
-
-        importance_df = pd.DataFrame(
-            {
-                "Feature": feature_names,
-                "Importance": importance_values
-            }
-        )
-
-        importance_df = importance_df.sort_values(
-            "Importance",
-            ascending=False
-        ).head(10)
-
-        fig, ax = plt.subplots(
-            figsize=(8, 5)
-        )
-
-        ax.barh(
-            importance_df["Feature"],
-            importance_df["Importance"]
-        )
-
-        ax.set_title(
-            "Top Model Risk Factors"
-        )
-
-        ax.set_xlabel(
-            "Importance"
-        )
-
-        ax.invert_yaxis()
-
-        st.pyplot(fig)
-
-        plt.close(fig)
-
-        # ----------------------------------------------------
-        # SHAP
-        # ----------------------------------------------------
-
-        if SHAP_AVAILABLE and selected_model_name == "Random Forest":
-
-            st.subheader(
-                "Explainable AI"
-            )
-
-            st.write(
-                "SHAP provides an additional explanation of how model features influence predictions."
-            )
-
-            try:
-
-                explainer = shap.TreeExplainer(
-                    model
-                )
-
-                shap_values = explainer.shap_values(
-                    input_data
-                )
-
-                if isinstance(shap_values, list):
-
-                    shap_values_to_plot = shap_values[1]
-
-                else:
-
-                    shap_values_to_plot = shap_values
-
-                fig_shap, ax_shap = plt.subplots(
-                    figsize=(8, 4)
-                )
-
-                values = np.abs(
-                    shap_values_to_plot[0]
-                )
-
-                shap_df = pd.DataFrame(
-                    {
-                        "Feature": feature_names,
-                        "SHAP": values
-                    }
-                ).sort_values(
-                    "SHAP",
-                    ascending=False
-                ).head(10)
-
-                ax_shap.barh(
-                    shap_df["Feature"],
-                    shap_df["SHAP"]
-                )
-
-                ax_shap.set_title(
-                    "SHAP Feature Impact"
-                )
-
-                ax_shap.invert_yaxis()
-
-                st.pyplot(
-                    fig_shap
-                )
-
-                plt.close(fig_shap)
-
-            except Exception:
-
-                st.info(
-                    "SHAP explanation could not be generated for this assessment."
-                )
-
-        # ----------------------------------------------------
-        # PDF REPORT
-        # ----------------------------------------------------
-
-        st.subheader(
-            "Download Report"
-        )
-
-        if REPORTLAB_AVAILABLE:
-
-            pdf_data = create_pdf_report(
-                st.session_state.username,
-                age,
-                "Female" if sex == 0 else "Male",
-                chol,
-                trestbps,
-                prediction_label,
-                risk_level,
-                probability,
-                selected_model_name,
-                accuracy,
-                bmi
-            )
-
-            st.download_button(
-                "Download Professional PDF Report",
-                data=pdf_data,
-                file_name="heart_disease_risk_report.pdf",
-                mime="application/pdf"
-            )
-
-        else:
-
-            st.warning(
-                "ReportLab is not installed. Add reportlab to requirements.txt."
-            )
-
-
-# ============================================================
-# RISK HISTORY
-# ============================================================
-
-elif menu == "📈 Risk History":
-
-    st.title(
-        "Risk History"
-    )
-
-    records_df = pd.read_sql_query(
-        """
-        SELECT
-            id AS ID,
-            prediction_date AS Date,
-            prediction AS Risk_Level,
-            probability AS Probability,
-            age AS Age,
-            sex AS Sex,
-            cholesterol AS Cholesterol,
-            blood_pressure AS Blood_Pressure,
-            model AS Model
-
-        FROM predictions
-
-        WHERE user_id = ?
-
-        ORDER BY prediction_date DESC
-        """,
-        conn,
-        params=(
-            st.session_state.user_id,
-        )
-    )
-
-    if records_df.empty:
-
-        st.info(
-            "No assessment records available."
-        )
-
-    else:
-
-        records_df["Date"] = pd.to_datetime(
-            records_df["Date"]
-        )
-
-        records_df["Probability_Percent"] = (
-            records_df["Probability"] * 100
-        ).round(1)
-
-        # ----------------------------------------------------
-        # FILTERS
-        # ----------------------------------------------------
 
         col1, col2 = st.columns(2)
 
+
+        # ====================================================
+        # COLUMN 1
+        # ====================================================
+
         with col1:
 
-            risk_filter = st.multiselect(
-                "Filter Risk Level",
-                [
-                    "Low Risk",
-                    "Moderate Risk",
-                    "High Risk"
-                ],
-                default=[
-                    "Low Risk",
-                    "Moderate Risk",
-                    "High Risk"
-                ]
+            age = st.number_input(
+                "Age",
+                min_value=1,
+                max_value=120,
+                value=50
             )
+
+
+            sex = st.selectbox(
+                "Sex",
+                options=[0, 1],
+                format_func=lambda x:
+                "Female"
+                if x == 0
+                else "Male"
+            )
+
+
+            cp = st.selectbox(
+                "Chest Pain Type",
+                options=[0, 1, 2, 3],
+                format_func=lambda x: [
+                    "Typical Angina",
+                    "Atypical Angina",
+                    "Non-anginal Pain",
+                    "Asymptomatic"
+                ][x]
+            )
+
+
+            trestbps = st.number_input(
+                "Resting Blood Pressure (mm Hg)",
+                min_value=80,
+                max_value=250,
+                value=120
+            )
+
+
+            chol = st.number_input(
+                "Serum Cholesterol (mg/dl)",
+                min_value=100,
+                max_value=600,
+                value=200
+            )
+
+
+            fbs = st.selectbox(
+                "Fasting Blood Sugar > 120 mg/dl",
+                options=[0, 1],
+                format_func=lambda x:
+                "No"
+                if x == 0
+                else "Yes"
+            )
+
+
+            restecg = st.selectbox(
+                "Resting ECG Results",
+                options=[0, 1, 2],
+                format_func=lambda x: [
+                    "Normal",
+                    "ST-T Abnormality",
+                    "Left Ventricular Hypertrophy"
+                ][x]
+            )
+
+
+        # ====================================================
+        # COLUMN 2
+        # ====================================================
 
         with col2:
 
-            model_filter = st.multiselect(
-                "Filter Model",
-                records_df["Model"].unique(),
-                default=list(
-                    records_df["Model"].unique()
-                )
+            thalach = st.number_input(
+                "Max Heart Rate Achieved",
+                min_value=60,
+                max_value=250,
+                value=150
             )
 
-        filtered_df = records_df[
-            records_df["Risk_Level"].isin(
-                risk_filter
-            )
-            &
-            records_df["Model"].isin(
-                model_filter
-            )
-        ]
 
-        # ----------------------------------------------------
-        # TABLE
-        # ----------------------------------------------------
-
-        st.dataframe(
-            filtered_df,
-            use_container_width=True,
-            hide_index=True
-        )
-
-        # ----------------------------------------------------
-        # TREND
-        # ----------------------------------------------------
-
-        st.subheader(
-            "Risk Probability Trend"
-        )
-
-        trend_df = filtered_df.sort_values(
-            "Date"
-        )
-
-        if not trend_df.empty:
-
-            st.line_chart(
-                trend_df.set_index(
-                    "Date"
-                )["Probability"]
+            exang = st.selectbox(
+                "Exercise Induced Angina",
+                options=[0, 1],
+                format_func=lambda x:
+                "No"
+                if x == 0
+                else "Yes"
             )
 
-        # ----------------------------------------------------
-        # SUMMARY
-        # ----------------------------------------------------
 
-        st.subheader(
-            "Assessment Summary"
-        )
+            oldpeak = st.number_input(
+                "ST Depression (Oldpeak)",
+                min_value=0.0,
+                max_value=10.0,
+                value=1.0,
+                step=0.1
+            )
 
-        total = len(records_df)
 
-        low = len(
-            records_df[
-                records_df["Risk_Level"] == "Low Risk"
-            ]
-        )
+            slope = st.selectbox(
+                "Slope of Peak Exercise ST",
+                options=[0, 1, 2],
+                format_func=lambda x: [
+                    "Upsloping",
+                    "Flat",
+                    "Downsloping"
+                ][x]
+            )
 
-        moderate = len(
-            records_df[
-                records_df["Risk_Level"] == "Moderate Risk"
-            ]
-        )
 
-        high = len(
-            records_df[
-                records_df["Risk_Level"] == "High Risk"
-            ]
-        )
+            ca = st.selectbox(
+                "Number of Major Vessels (0-3)",
+                options=[0, 1, 2, 3]
+            )
 
-        c1, c2, c3, c4 = st.columns(4)
 
-        with c1:
-            st.metric("Total", total)
+            thal = st.selectbox(
+                "Thalassemia",
+                options=[0, 1, 2, 3],
+                format_func=lambda x: [
+                    "Normal",
+                    "Fixed Defect",
+                    "Reversible Defect",
+                    "Unknown"
+                ][x]
+            )
 
-        with c2:
-            st.metric("Low Risk", low)
 
-        with c3:
-            st.metric("Moderate Risk", moderate)
-
-        with c4:
-            st.metric("High Risk", high)
-
-        # ----------------------------------------------------
-        # EXPORT
-        # ----------------------------------------------------
-
-        st.subheader(
-            "Export Records"
-        )
-
-        csv_data = filtered_df.to_csv(
-            index=False
-        )
-
-        st.download_button(
-            "Download CSV",
-            data=csv_data,
-            file_name="heart_disease_records.csv",
-            mime="text/csv"
-        )
-
-        excel_data = create_excel_file(
-            filtered_df
-        )
-
-        st.download_button(
-            "Download Excel",
-            data=excel_data,
-            file_name="heart_disease_records.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
-        # ----------------------------------------------------
-        # DELETE RECORD
-        # ----------------------------------------------------
-
-        st.subheader(
-            "Delete Assessment"
-        )
-
-        record_ids = records_df["ID"].tolist()
-
-        selected_id = st.selectbox(
-            "Select assessment to delete",
-            record_ids
-        )
+        # ====================================================
+        # PREDICT
+        # ====================================================
 
         if st.button(
-            "Delete Selected Assessment"
+            "Predict Risk",
+            type="primary",
+            use_container_width=True
         ):
 
+
+            # ------------------------------------------------
+            # CREATE INPUT DATA
+            # ------------------------------------------------
+
+            input_data = pd.DataFrame(
+                [[
+                    age,
+                    sex,
+                    cp,
+                    trestbps,
+                    chol,
+                    fbs,
+                    restecg,
+                    thalach,
+                    exang,
+                    oldpeak,
+                    slope,
+                    ca,
+                    thal
+                ]],
+                columns=feature_names
+            )
+
+
+            # ------------------------------------------------
+            # PREDICTION
+            # ------------------------------------------------
+
+            prediction = model.predict(
+                input_data
+            )[0]
+
+
+            probability = model.predict_proba(
+                input_data
+            )[0][1]
+
+
+            # ------------------------------------------------
+            # PREDICTION LABEL
+            # ------------------------------------------------
+
+            if prediction == 1:
+
+                prediction_label = "Positive"
+
+            else:
+
+                prediction_label = "Negative"
+
+
+            # ------------------------------------------------
+            # RISK LEVEL
+            # ------------------------------------------------
+
+            if probability < 0.30:
+
+                risk_level = "Low Risk"
+
+            elif probability < 0.70:
+
+                risk_level = "Moderate Risk"
+
+            else:
+
+                risk_level = "High Risk"
+
+
+            # ------------------------------------------------
+            # SAVE TO DATABASE
+            # ------------------------------------------------
+
             cursor.execute(
                 """
-                DELETE FROM predictions
-                WHERE id = ?
-                AND user_id = ?
-                """,
+                INSERT INTO predictions
                 (
-                    selected_id,
-                    st.session_state.user_id
+                    user_id,
+                    prediction_date,
+                    prediction,
+                    probability,
+                    age,
+                    sex,
+                    cholesterol,
+                    blood_pressure,
+                    model
                 )
-            )
-
-            conn.commit()
-
-            st.success(
-                "Assessment deleted."
-            )
-
-            st.rerun()
-
-
-# ============================================================
-# MODEL PERFORMANCE
-# ============================================================
-
-elif menu == "🧠 Model Performance":
-
-    st.title(
-        "Machine Learning Model Performance"
-    )
-
-    st.write(
-        "Compare the performance of the three trained classification models."
-    )
-
-    performance_df = pd.DataFrame(
-        [
-            {
-                "Model": name,
-                "Accuracy": result["accuracy"],
-                "Precision": result["precision"],
-                "Recall": result["recall"],
-                "F1 Score": result["f1"],
-                "ROC-AUC": result["auc"]
-            }
-
-            for name, result in all_results.items()
-        ]
-    )
-
-    st.dataframe(
-        performance_df.style.format(
-            {
-                "Accuracy": "{:.1%}",
-                "Precision": "{:.1%}",
-                "Recall": "{:.1%}",
-                "F1 Score": "{:.1%}",
-                "ROC-AUC": "{:.3f}"
-            }
-        ),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.success(
-        f"Best accuracy: {best_name}"
-    )
-
-    # --------------------------------------------------------
-    # ROC CURVES
-    # --------------------------------------------------------
-
-    st.subheader(
-        "ROC Curve Comparison"
-    )
-
-    fig, ax = plt.subplots(
-        figsize=(8, 6)
-    )
-
-    for name, result in all_results.items():
-
-        fpr, tpr, _ = roc_curve(
-            result["y_test"],
-            result["probabilities"]
-        )
-
-        ax.plot(
-            fpr,
-            tpr,
-            label=f"{name} (AUC = {result['auc']:.3f})"
-        )
-
-    ax.plot(
-        [0, 1],
-        [0, 1],
-        linestyle="--"
-    )
-
-    ax.set_xlabel(
-        "False Positive Rate"
-    )
-
-    ax.set_ylabel(
-        "True Positive Rate"
-    )
-
-    ax.set_title(
-        "ROC-AUC Comparison"
-    )
-
-    ax.legend()
-
-    st.pyplot(fig)
-
-    plt.close(fig)
-
-    # --------------------------------------------------------
-    # CONFUSION MATRIX
-    # --------------------------------------------------------
-
-    st.subheader(
-        "Confusion Matrix"
-    )
-
-    selected_matrix_model = st.selectbox(
-        "Select Model",
-        list(all_results.keys()),
-        key="confusion_model"
-    )
-
-    matrix = confusion_matrix(
-        all_results[selected_matrix_model]["y_test"],
-        all_results[selected_matrix_model]["predictions"]
-    )
-
-    matrix_df = pd.DataFrame(
-        matrix,
-        index=[
-            "Actual Negative",
-            "Actual Positive"
-        ],
-        columns=[
-            "Predicted Negative",
-            "Predicted Positive"
-        ]
-    )
-
-    st.dataframe(
-        matrix_df,
-        use_container_width=True
-    )
-
-
-# ============================================================
-# DATASET ANALYTICS
-# ============================================================
-
-elif menu == "🔬 Dataset Analytics":
-
-    st.title(
-        "Dataset Analytics"
-    )
-
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-
-        st.metric(
-            "Patient Records",
-            len(df)
-        )
-
-    with c2:
-
-        st.metric(
-            "Features",
-            len(feature_names)
-        )
-
-    with c3:
-
-        positive_rate = (
-            df["target"].mean()
-        )
-
-        st.metric(
-            "Positive Cases",
-            f"{positive_rate:.1%}"
-        )
-
-    st.divider()
-
-    # --------------------------------------------------------
-    # TARGET DISTRIBUTION
-    # --------------------------------------------------------
-
-    st.subheader(
-        "Target Distribution"
-    )
-
-    target_counts = df["target"].value_counts()
-
-    target_df = pd.DataFrame(
-        {
-            "Target": [
-                "Negative",
-                "Positive"
-            ],
-            "Count": [
-                int(target_counts.get(0, 0)),
-                int(target_counts.get(1, 0))
-            ]
-        }
-    )
-
-    st.bar_chart(
-        target_df.set_index("Target")
-    )
-
-    # --------------------------------------------------------
-    # AGE DISTRIBUTION
-    # --------------------------------------------------------
-
-    st.subheader(
-        "Age Distribution"
-    )
-
-    age_distribution = pd.DataFrame(
-        {
-            "Age": df["age"]
-        }
-    )
-
-    st.bar_chart(
-        age_distribution["Age"].value_counts().sort_index()
-    )
-
-    # --------------------------------------------------------
-    # CHOLESTEROL
-    # --------------------------------------------------------
-
-    st.subheader(
-        "Cholesterol Statistics"
-    )
-
-    chol_col1, chol_col2, chol_col3 = st.columns(3)
-
-    with chol_col1:
-
-        st.metric(
-            "Average",
-            f"{df['chol'].mean():.1f}"
-        )
-
-    with chol_col2:
-
-        st.metric(
-            "Minimum",
-            f"{df['chol'].min():.0f}"
-        )
-
-    with chol_col3:
-
-        st.metric(
-            "Maximum",
-            f"{df['chol'].max():.0f}"
-        )
-
-    st.subheader(
-        "Dataset Preview"
-    )
-
-    st.dataframe(
-        df.head(20),
-        use_container_width=True,
-        hide_index=True
-    )
-
-
-# ============================================================
-# PROFILE
-# ============================================================
-
-elif menu == "👤 My Profile":
-
-    st.title(
-        "My Profile"
-    )
-
-    cursor.execute(
-        """
-        SELECT
-            username,
-            email
-        FROM users
-        WHERE id = ?
-        """,
-        (
-            st.session_state.user_id,
-        )
-    )
-
-    user = cursor.fetchone()
-
-    if user:
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-
-            st.subheader(
-                "Account Information"
-            )
-
-            st.write(
-                f"**Username:** {user[0]}"
-            )
-
-            st.write(
-                f"**Email:** {user[1]}"
-            )
-
-        with col2:
-
-            cursor.execute(
-                """
-                SELECT COUNT(*)
-                FROM predictions
-                WHERE user_id = ?
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     st.session_state.user_id,
+                    datetime.now().strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
+                    risk_level,
+                    float(probability),
+                    int(age),
+                    "Female" if sex == 0 else "Male",
+                    int(chol),
+                    int(trestbps),
+                    selected_model_name
                 )
             )
 
-            assessment_count = cursor.fetchone()[0]
 
-            st.metric(
-                "Total Assessments",
-                assessment_count
+            conn.commit()
+
+
+            # =================================================
+            # RESULTS
+            # =================================================
+
+            st.divider()
+
+            st.header(
+                "Prediction Results"
             )
 
-    st.divider()
 
-    # --------------------------------------------------------
-    # PASSWORD CHANGE
-    # --------------------------------------------------------
+            st.caption(
+                f"Using: {selected_model_name}"
+            )
 
-    st.subheader(
-        "Change Password"
-    )
 
-    current_password = st.text_input(
-        "Current Password",
-        type="password"
-    )
+            if risk_level == "Low Risk":
 
-    new_password = st.text_input(
-        "New Password",
-        type="password"
-    )
+                st.success(
+                    f"{risk_level} of Heart Disease "
+                    f"({probability:.1%} probability)"
+                )
 
-    confirm_new_password = st.text_input(
-        "Confirm New Password",
-        type="password"
-    )
 
-    if st.button(
-        "Change Password"
-    ):
+            elif risk_level == "Moderate Risk":
 
-        cursor.execute(
+                st.warning(
+                    f"{risk_level} of Heart Disease "
+                    f"({probability:.1%} probability)"
+                )
+
+
+            else:
+
+                st.error(
+                    f"{risk_level} of Heart Disease "
+                    f"({probability:.1%} probability)"
+                )
+
+
+            # ------------------------------------------------
+            # RISK LEVEL
+            # ------------------------------------------------
+
+            st.subheader(
+                "Risk Probability"
+            )
+
+
+            st.progress(
+                int(probability * 100)
+            )
+
+
+            # ------------------------------------------------
+            # METRICS
+            # ------------------------------------------------
+
+            metric1, metric2, metric3 = st.columns(3)
+
+
+            with metric1:
+
+                st.metric(
+                    "Risk Probability",
+                    f"{probability:.1%}"
+                )
+
+
+            with metric2:
+
+                st.metric(
+                    "Prediction",
+                    prediction_label
+                )
+
+
+            with metric3:
+
+                st.metric(
+                    "Model Accuracy",
+                    f"{accuracy:.1%}"
+                )
+
+
+            # =================================================
+            # HEALTH RECOMMENDATIONS
+            # =================================================
+
+            st.subheader(
+                "Health Recommendations"
+            )
+
+
+            if probability < 0.30:
+
+                st.info(
+                    """
+                    Continue exercising regularly.
+
+                    Maintain a healthy diet.
+
+                    Schedule routine health check-ups.
+
+                    Monitor blood pressure and cholesterol.
+                    """
+                )
+
+
+            elif probability < 0.70:
+
+                st.warning(
+                    """
+                    Increase physical activity.
+
+                    Reduce saturated fats and sodium.
+
+                    Monitor cholesterol levels.
+
+                    Consult a healthcare professional.
+                    """
+                )
+
+
+            else:
+
+                st.error(
+                    """
+                    Seek medical advice promptly.
+
+                    Monitor blood pressure closely.
+
+                    Improve dietary habits.
+
+                    Follow prescribed treatment plans.
+                    """
+                )
+
+
+            # =================================================
+            # HEALTH ALERTS
+            # =================================================
+
+            st.subheader(
+                "Health Alerts"
+            )
+
+
+            alerts_found = False
+
+
+            if trestbps > 140:
+
+                st.warning(
+                    "High blood pressure detected."
+                )
+
+                alerts_found = True
+
+
+            if chol > 240:
+
+                st.warning(
+                    "High cholesterol detected."
+                )
+
+                alerts_found = True
+
+
+            if exang == 1:
+
+                st.warning(
+                    "Exercise-induced angina reported."
+                )
+
+                alerts_found = True
+
+
+            if oldpeak > 2:
+
+                st.warning(
+                    "Elevated ST depression detected."
+                )
+
+                alerts_found = True
+
+
+            if not alerts_found:
+
+                st.success(
+                    "No additional health alerts detected."
+                )
+
+
+            # =================================================
+            # TOP RISK FACTORS
+            # =================================================
+
+            st.subheader(
+                "Top Risk Factors"
+            )
+
+
+            if hasattr(
+                model,
+                "feature_importances_"
+            ):
+
+                importance_df = pd.DataFrame(
+                    {
+                        "Feature": feature_names,
+                        "Importance": model.feature_importances_
+                    }
+                )
+
+
+            else:
+
+                importance_df = pd.DataFrame(
+                    {
+                        "Feature": feature_names,
+                        "Importance": np.abs(
+                            model.coef_[0]
+                        )
+                    }
+                )
+
+
+            importance_df = importance_df.sort_values(
+                by="Importance",
+                ascending=False
+            ).head(10)
+
+
+            fig, ax = plt.subplots(
+                figsize=(8, 5)
+            )
+
+
+            ax.barh(
+                importance_df["Feature"],
+                importance_df["Importance"]
+            )
+
+
+            ax.set_title(
+                "Top Risk Factors"
+            )
+
+
+            ax.set_xlabel(
+                "Importance"
+            )
+
+
+            ax.invert_yaxis()
+
+
+            st.pyplot(
+                fig
+            )
+
+
+            plt.close(
+                fig
+            )
+
+
+            # =================================================
+            # DOWNLOAD REPORT
+            # =================================================
+
+            st.subheader(
+                "Download Report"
+            )
+
+
+            report = f"""
+Heart Disease Risk Report
+==========================
+
+Patient
+-------
+
+Username: {st.session_state.username}
+
+Date:
+{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+
+Patient Information
+-------------------
+
+Age: {age}
+
+Sex: {"Female" if sex == 0 else "Male"}
+
+Cholesterol: {chol} mg/dl
+
+Blood Pressure: {trestbps} mm Hg
+
+
+Prediction Results
+------------------
+
+Prediction: {prediction_label}
+
+Risk Level: {risk_level}
+
+Risk Probability: {probability:.2%}
+
+Model Used: {selected_model_name}
+
+Model Accuracy: {accuracy:.2%}
+
+
+Important
+---------
+
+This report is generated by an educational
+machine learning application.
+
+It should not replace professional medical advice.
+"""
+
+
+            st.download_button(
+                label="Download Risk Report",
+                data=report,
+                file_name="heart_risk_report.txt",
+                mime="text/plain"
+            )
+
+
+    # ========================================================
+    # MY RECORDS
+    # ========================================================
+
+    elif menu == "My Records":
+
+        st.header(
+            "My Records"
+        )
+
+
+        st.write(
+            "View your previous heart disease assessments."
+        )
+
+
+        records_df = pd.read_sql_query(
             """
-            SELECT password
-            FROM users
-            WHERE id = ?
+            SELECT
+                prediction_date AS Date,
+                prediction AS Risk_Level,
+                probability AS Probability,
+                age AS Age,
+                sex AS Sex,
+                cholesterol AS Cholesterol,
+                blood_pressure AS Blood_Pressure,
+                model AS Model
+
+            FROM predictions
+
+            WHERE user_id = ?
+
+            ORDER BY prediction_date DESC
             """,
-            (
+            conn,
+            params=(
                 st.session_state.user_id,
             )
         )
 
-        stored_password = cursor.fetchone()[0]
 
-        if not bcrypt.checkpw(
-            current_password.encode("utf-8"),
-            stored_password
-        ):
+        if records_df.empty:
 
-            st.error(
-                "Current password is incorrect."
+            st.info(
+                "You do not have any prediction records yet."
             )
 
-        elif len(new_password) < 6:
-
-            st.error(
-                "New password must contain at least 6 characters."
-            )
-
-        elif new_password != confirm_new_password:
-
-            st.error(
-                "New passwords do not match."
-            )
 
         else:
 
-            new_hash = bcrypt.hashpw(
-                new_password.encode("utf-8"),
-                bcrypt.gensalt()
+            records_df["Probability"] = (
+                records_df["Probability"] * 100
+            ).round(1)
+
+
+            st.dataframe(
+                records_df,
+                use_container_width=True,
+                hide_index=True
             )
 
-            cursor.execute(
-                """
-                UPDATE users
-                SET password = ?
-                WHERE id = ?
-                """,
-                (
-                    new_hash,
-                    st.session_state.user_id
+
+            # ------------------------------------------------
+            # SUMMARY
+            # ------------------------------------------------
+
+            st.subheader(
+                "Assessment Summary"
+            )
+
+
+            total_records = len(
+                records_df
+            )
+
+
+            high_risk = len(
+                records_df[
+                    records_df["Risk_Level"] == "High Risk"
+                ]
+            )
+
+
+            moderate_risk = len(
+                records_df[
+                    records_df["Risk_Level"] == "Moderate Risk"
+                ]
+            )
+
+
+            low_risk = len(
+                records_df[
+                    records_df["Risk_Level"] == "Low Risk"
+                ]
+            )
+
+
+            metric1, metric2, metric3, metric4 = st.columns(4)
+
+
+            with metric1:
+
+                st.metric(
+                    "Assessments",
+                    total_records
                 )
+
+
+            with metric2:
+
+                st.metric(
+                    "Low Risk",
+                    low_risk
+                )
+
+
+            with metric3:
+
+                st.metric(
+                    "Moderate Risk",
+                    moderate_risk
+                )
+
+
+            with metric4:
+
+                st.metric(
+                    "High Risk",
+                    high_risk
+                )
+
+
+            # ------------------------------------------------
+            # DOWNLOAD RECORDS
+            # ------------------------------------------------
+
+            csv_data = records_df.to_csv(
+                index=False
             )
 
-            conn.commit()
 
-            st.success(
-                "Password changed successfully."
+            st.download_button(
+                label="Download My Records",
+                data=csv_data,
+                file_name="my_heart_disease_records.csv",
+                mime="text/csv"
             )
 
 
+    # ========================================================
+    # LOGOUT
+    # ========================================================
+
+    elif menu == "Logout":
+
+        st.session_state.logged_in = False
+
+        st.session_state.user_id = None
+
+        st.session_state.username = None
+
+        st.rerun()
+
+
 # ============================================================
-# LOGOUT
+# SIDEBAR FOOTER
 # ============================================================
 
-elif menu == "🚪 Logout":
+if st.session_state.logged_in:
 
-    st.session_state.logged_in = False
-    st.session_state.user_id = None
-    st.session_state.username = None
+    st.sidebar.divider()
 
-    st.rerun()
-
-
-# ============================================================
-# FOOTER
-# ============================================================
-
-st.sidebar.divider()
-
-st.sidebar.caption(
-    "Heart Disease Risk Predictor"
-)
-
-st.sidebar.caption(
-    "Educational machine-learning application."
-)
-
-st.sidebar.caption(
-    "Not a medical diagnosis."
-)
+    st.sidebar.info(
+        "This application is for educational purposes and should not replace professional medical advice."
+    )
