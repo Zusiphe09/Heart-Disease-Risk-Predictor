@@ -671,7 +671,7 @@ if not st.session_state.logged_in:
 
 
         st.write("### Important")
-        st.write("### Important")
+   
 
         st.warning(
             "This application is for educational purposes only "
