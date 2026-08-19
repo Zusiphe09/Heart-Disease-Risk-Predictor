@@ -31,41 +31,41 @@ st.set_page_config(
 
 st.markdown(
     """
-<style>
+    <style>
 
-.hero-card {
-    background: linear-gradient(135deg, #0F172A, #1E3A8A);
-    padding: 45px 30px;
-    border-radius: 20px;
-    text-align: center;
-    margin-bottom: 30px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-}
+    .hero-card {
+        background: linear-gradient(135deg, #0F172A, #1E3A8A);
+        padding: 45px 30px;
+        border-radius: 20px;
+        text-align: center;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    }
 
-.hero-logo {
-    width: 90px;
-    height: 90px;
-    object-fit: contain;
-    background: white;
-    border-radius: 50%;
-    padding: 10px;
-    margin-bottom: 20px;
-}
+    .hero-logo {
+        width: 90px;
+        height: 90px;
+        object-fit: contain;
+        background: white;
+        border-radius: 50%;
+        padding: 10px;
+        margin-bottom: 20px;
+    }
 
-.hero-title {
-    color: white;
-    font-size: 34px;
-    font-weight: 700;
-    margin-bottom: 10px;
-}
+    .hero-title {
+        color: white;
+        font-size: 34px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
 
-.hero-subtitle {
-    color: #DBEAFE;
-    font-size: 17px;
-}
+    .hero-subtitle {
+        color: #DBEAFE;
+        font-size: 17px;
+    }
 
-</style>
-""",
+    </style>
+    """,
     unsafe_allow_html=True
 )
 
@@ -537,14 +537,11 @@ best_name = max(
 
 
 # ============================================================
-# LANDING PAGE
+# ABOUT SECTION
+# ONLY SHOWS WHEN USER IS NOT LOGGED IN
 # ============================================================
 
 if not st.session_state.logged_in:
-
-    # ========================================================
-    # SIDEBAR ABOUT SECTION
-    # ========================================================
 
     st.sidebar.title(
         "Heart Disease Predictor"
@@ -611,6 +608,12 @@ if not st.session_state.logged_in:
         )
 
 
+# ============================================================
+# LANDING PAGE
+# ============================================================
+
+if not st.session_state.logged_in:
+
     # ========================================================
     # HERO SECTION
     # ========================================================
@@ -623,12 +626,11 @@ if not st.session_state.logged_in:
                 image_file.read()
             ).decode()
 
-        logo_html = f"""
-        <img
-            src="data:image/png;base64,{encoded_logo}"
-            class="hero-logo"
-        />
-        """
+        logo_html = (
+            '<img src="data:image/png;base64,'
+            + encoded_logo
+            + '" class="hero-logo">'
+        )
 
     except Exception:
 
@@ -641,13 +643,13 @@ if not st.session_state.logged_in:
 
             {logo_html}
 
-            <div class="hero-title">
+            <h1 class="hero-title">
                 Heart Disease Risk Predictor
-            </div>
+            </h1>
 
-            <div class="hero-subtitle">
+            <p class="hero-subtitle">
                 AI-Powered Cardiovascular Risk Assessment
-            </div>
+            </p>
 
         </div>
         """,
@@ -1022,10 +1024,6 @@ else:
 
         with col2:
 
-            # ------------------------------------------------
-            # BMI CALCULATION
-            # ------------------------------------------------
-
             height_m = height / 100
 
             bmi = weight / (
@@ -1098,10 +1096,6 @@ else:
             use_container_width=True
         ):
 
-            # ------------------------------------------------
-            # CREATE INPUT DATA
-            # ------------------------------------------------
-
             input_data = pd.DataFrame(
                 [[
                     age,
@@ -1122,10 +1116,6 @@ else:
             )
 
 
-            # ------------------------------------------------
-            # PREDICTION
-            # ------------------------------------------------
-
             prediction = model.predict(
                 input_data
             )[0]
@@ -1135,10 +1125,6 @@ else:
             )[0][1]
 
 
-            # ------------------------------------------------
-            # PREDICTION LABEL
-            # ------------------------------------------------
-
             if prediction == 1:
 
                 prediction_label = "Positive"
@@ -1147,10 +1133,6 @@ else:
 
                 prediction_label = "Negative"
 
-
-            # ------------------------------------------------
-            # RISK LEVEL
-            # ------------------------------------------------
 
             if probability < 0.30:
 
@@ -1165,9 +1147,9 @@ else:
                 risk_level = "High Risk"
 
 
-            # ------------------------------------------------
+            # =================================================
             # SAVE TO DATABASE
-            # ------------------------------------------------
+            # =================================================
 
             cursor.execute(
                 """
@@ -1226,10 +1208,6 @@ else:
             )
 
 
-            # ------------------------------------------------
-            # RISK MESSAGE
-            # ------------------------------------------------
-
             if risk_level == "Low Risk":
 
                 st.success(
@@ -1251,10 +1229,6 @@ else:
                     f"({probability:.1%} probability)"
                 )
 
-
-            # ------------------------------------------------
-            # PROGRESS BAR
-            # ------------------------------------------------
 
             st.subheader(
                 "Risk Level"
@@ -1440,7 +1414,6 @@ else:
 
                 alerts_found = True
 
-
             elif bmi >= 25:
 
                 st.info(
@@ -1497,30 +1470,24 @@ else:
                 figsize=(8, 5)
             )
 
-
             ax.barh(
                 importance_df["Feature"],
                 importance_df["Importance"]
             )
 
-
             ax.set_title(
                 "Top Risk Factors"
             )
-
 
             ax.set_xlabel(
                 "Importance"
             )
 
-
             ax.invert_yaxis()
-
 
             st.pyplot(
                 fig
             )
-
 
             plt.close(
                 fig
@@ -1534,7 +1501,6 @@ else:
             st.subheader(
                 "Download Report"
             )
-
 
             report = f"""
 Heart Disease Risk Report
