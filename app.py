@@ -31,43 +31,44 @@ st.set_page_config(
 
 st.markdown(
     """
-<style>
+    <style>
 
-.hero-card {
-    background: linear-gradient(135deg, #0F172A, #1E3A8A);
-    padding: 45px 30px;
-    border-radius: 20px;
-    text-align: center;
-    margin-bottom: 30px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-}
+    .hero-card {
+        background: linear-gradient(135deg, #0F172A, #1E3A8A);
+        padding: 45px 30px;
+        border-radius: 20px;
+        text-align: center;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    }
 
-.hero-logo {
-    width: 90px;
-    height: 90px;
-    object-fit: contain;
-    background: white;
-    border-radius: 50%;
-    padding: 10px;
-    margin-bottom: 20px;
-}
+    .hero-logo {
+        width: 90px;
+        height: 90px;
+        object-fit: contain;
+        background: white;
+        border-radius: 50%;
+        padding: 10px;
+        margin-bottom: 20px;
+    }
 
-.hero-title {
-    color: white;
-    font-size: 34px;
-    font-weight: 700;
-    margin-bottom: 10px;
-}
+    .hero-title {
+        color: white;
+        font-size: 34px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
 
-.hero-subtitle {
-    color: #DBEAFE;
-    font-size: 17px;
-}
+    .hero-subtitle {
+        color: #DBEAFE;
+        font-size: 17px;
+    }
 
-</style>
-""",
+    </style>
+    """,
     unsafe_allow_html=True
 )
+
 
 # ============================================================
 # DATABASE CONNECTION
@@ -540,7 +541,7 @@ best_name = max(
 # ============================================================
 
 st.sidebar.title(
-    "❤️ Heart Disease Predictor"
+    "Heart Disease Predictor"
 )
 
 with st.sidebar.expander(
@@ -610,48 +611,47 @@ with st.sidebar.expander(
 
 if not st.session_state.logged_in:
 
-  # ========================================================
-# HERO SECTION
-# ========================================================
+    # ========================================================
+    # HERO SECTION
+    # ========================================================
 
-try:
+    try:
 
-    with open("logo.png", "rb") as image_file:
+        with open("logo.png", "rb") as image_file:
 
-        encoded_logo = base64.b64encode(
-            image_file.read()
-        ).decode()
+            encoded_logo = base64.b64encode(
+                image_file.read()
+            ).decode("utf-8")
 
-    logo_html = f"""
-    <img
-        src="data:image/png;base64,{encoded_logo}"
-        class="hero-logo"
-    />
-    """
+        logo_html = (
+            f'<img src="data:image/png;base64,{encoded_logo}" '
+            f'class="hero-logo" alt="Heart Disease Predictor Logo">'
+        )
 
-except Exception:
+    except FileNotFoundError:
 
-    logo_html = ""
+        logo_html = ""
+
+    except Exception:
+
+        logo_html = ""
 
 
-st.markdown(
-    f"""
-    <div class="hero-card">
-
-        {logo_html}
-
-        <div class="hero-title">
-            Heart Disease Risk Predictor
+    st.markdown(
+        f"""
+        <div class="hero-card">
+            {logo_html}
+            <div class="hero-title">
+                Heart Disease Risk Predictor
+            </div>
+            <div class="hero-subtitle">
+                AI-Powered Cardiovascular Risk Assessment
+            </div>
         </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-        <div class="hero-subtitle">
-            AI-Powered Cardiovascular Risk Assessment
-        </div>
-
-    </div>
-    """,
-    unsafe_allow_html=True
-)
 
     # ========================================================
     # SIGN IN / SIGN UP TABS
@@ -713,9 +713,7 @@ st.markdown(
                 if user:
 
                     st.session_state.logged_in = True
-
                     st.session_state.user_id = user[0]
-
                     st.session_state.username = user[1]
 
                     st.rerun()
@@ -836,10 +834,6 @@ else:
 
     if menu == "New Assessment":
 
-        # ----------------------------------------------------
-        # MODEL COMPARISON
-        # ----------------------------------------------------
-
         st.sidebar.divider()
 
         st.sidebar.header(
@@ -851,7 +845,6 @@ else:
                 "Model": list(
                     all_results.keys()
                 ),
-
                 "Accuracy": [
                     f"{all_results[name]['accuracy']:.1%}"
                     for name in all_results
@@ -1020,10 +1013,6 @@ else:
 
         with col2:
 
-            # ------------------------------------------------
-            # BMI CALCULATION
-            # ------------------------------------------------
-
             height_m = height / 100
 
             bmi = weight / (
@@ -1096,10 +1085,6 @@ else:
             use_container_width=True
         ):
 
-            # ------------------------------------------------
-            # CREATE INPUT DATA
-            # ------------------------------------------------
-
             input_data = pd.DataFrame(
                 [[
                     age,
@@ -1120,10 +1105,6 @@ else:
             )
 
 
-            # ------------------------------------------------
-            # PREDICTION
-            # ------------------------------------------------
-
             prediction = model.predict(
                 input_data
             )[0]
@@ -1133,10 +1114,6 @@ else:
             )[0][1]
 
 
-            # ------------------------------------------------
-            # PREDICTION LABEL
-            # ------------------------------------------------
-
             if prediction == 1:
 
                 prediction_label = "Positive"
@@ -1145,10 +1122,6 @@ else:
 
                 prediction_label = "Negative"
 
-
-            # ------------------------------------------------
-            # RISK LEVEL
-            # ------------------------------------------------
 
             if probability < 0.30:
 
@@ -1223,10 +1196,6 @@ else:
                 f"Using: {selected_model_name}"
             )
 
-
-            # ------------------------------------------------
-            # RISK MESSAGE
-            # ------------------------------------------------
 
             if risk_level == "Low Risk":
 
@@ -1438,7 +1407,6 @@ else:
 
                 alerts_found = True
 
-
             elif bmi >= 25:
 
                 st.info(
@@ -1495,30 +1463,24 @@ else:
                 figsize=(8, 5)
             )
 
-
             ax.barh(
                 importance_df["Feature"],
                 importance_df["Importance"]
             )
 
-
             ax.set_title(
                 "Top Risk Factors"
             )
-
 
             ax.set_xlabel(
                 "Importance"
             )
 
-
             ax.invert_yaxis()
-
 
             st.pyplot(
                 fig
             )
-
 
             plt.close(
                 fig
@@ -1532,7 +1494,6 @@ else:
             st.subheader(
                 "Download Report"
             )
-
 
             report = f"""
 Heart Disease Risk Report
@@ -1628,11 +1589,8 @@ It should not replace professional medical advice.
                 cholesterol AS Cholesterol,
                 blood_pressure AS Blood_Pressure,
                 model AS Model
-
             FROM predictions
-
             WHERE user_id = ?
-
             ORDER BY prediction_date DESC
             """,
             conn,
@@ -1648,7 +1606,6 @@ It should not replace professional medical advice.
                 "You do not have any prediction records yet."
             )
 
-
         else:
 
             records_df["Probability"] = (
@@ -1656,18 +1613,15 @@ It should not replace professional medical advice.
             ).round(1)
 
             records_df["Height_cm"] = (
-                records_df["Height_cm"]
-                .round(1)
+                records_df["Height_cm"].round(1)
             )
 
             records_df["Weight_kg"] = (
-                records_df["Weight_kg"]
-                .round(1)
+                records_df["Weight_kg"].round(1)
             )
 
             records_df["BMI"] = (
-                records_df["BMI"]
-                .round(1)
+                records_df["BMI"].round(1)
             )
 
 
@@ -1772,9 +1726,7 @@ It should not replace professional medical advice.
     elif menu == "Logout":
 
         st.session_state.logged_in = False
-
         st.session_state.user_id = None
-
         st.session_state.username = None
 
         st.rerun()
