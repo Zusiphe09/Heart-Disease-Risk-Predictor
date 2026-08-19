@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sqlite3
 import bcrypt
+import base64
 
 from datetime import datetime
 
@@ -19,7 +20,7 @@ from sklearn.metrics import accuracy_score
 
 st.set_page_config(
     page_title="Heart Disease Risk Predictor",
-    page_icon="❤️",
+    page_icon="logo.png",
     layout="centered"
 )
 
@@ -41,16 +42,14 @@ st.markdown(
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
 }
 
-.logo-circle {
-    width: 75px;
-    height: 75px;
+.hero-logo {
+    width: 90px;
+    height: 90px;
+    object-fit: contain;
     background: white;
     border-radius: 50%;
-    margin: 0 auto 20px auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
+    padding: 10px;
+    margin-bottom: 20px;
 }
 
 .hero-title {
@@ -69,7 +68,6 @@ st.markdown(
 """,
     unsafe_allow_html=True
 )
-
 
 # ============================================================
 # DATABASE CONNECTION
@@ -612,31 +610,48 @@ with st.sidebar.expander(
 
 if not st.session_state.logged_in:
 
-    # ========================================================
-    # HERO SECTION
-    # ========================================================
+  # ========================================================
+# HERO SECTION
+# ========================================================
 
-    st.markdown(
-        """
-<div class="hero-card">
+try:
 
-    <div class="logo-circle">
-        ❤️
+    with open("logo.png", "rb") as image_file:
+
+        encoded_logo = base64.b64encode(
+            image_file.read()
+        ).decode()
+
+    logo_html = f"""
+    <img
+        src="data:image/png;base64,{encoded_logo}"
+        class="hero-logo"
+    />
+    """
+
+except Exception:
+
+    logo_html = ""
+
+
+st.markdown(
+    f"""
+    <div class="hero-card">
+
+        {logo_html}
+
+        <div class="hero-title">
+            Heart Disease Risk Predictor
+        </div>
+
+        <div class="hero-subtitle">
+            AI-Powered Cardiovascular Risk Assessment
+        </div>
+
     </div>
-
-    <div class="hero-title">
-        Heart Disease Risk Predictor
-    </div>
-
-    <div class="hero-subtitle">
-        AI-Powered Cardiovascular Risk Assessment
-    </div>
-
-</div>
-""",
-        unsafe_allow_html=True
-    )
-
+    """,
+    unsafe_allow_html=True
+)
 
     # ========================================================
     # SIGN IN / SIGN UP TABS
